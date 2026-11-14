@@ -11,6 +11,19 @@ import { AcceptanceRoom } from "./world/AcceptanceRoom.js";
 import { showEndScreen } from "./core/EndScreen.js";
 import { Menus } from "./ui/Menus.js";
 
+// Encuadre del menú de inicio
+const MENU_SHOT = {
+  cameraX: 0.75, // distancia al eje del pasillo (los límites de caminata son ±0.8)
+  cameraY: 1.6,
+  dz: 0, // corrimiento a lo largo del pasillo respecto del centro de la puerta
+  yawOffset: 0.35, // radianes que se gira hacia el fondo; más = la puerta se corre a la derecha
+  pitch: -0.2, // negativo mira hacia abajo (encuadra la puerta entera)
+};
+
+// Encuadre de animación de ingreso a puerta
+const DOOR_LOOK_Y = 1.3;
+const DOOR_LOOK_MAX_DOWN = 0.32; // tope de inclinación hacia abajo, en radianes
+
 class App {
   constructor() {
     this.container = document.body;
@@ -61,15 +74,8 @@ class App {
     document.body.appendChild(this.fadeOverlay);
 
     const startBtn = document.getElementById("btn-start");
-    const overlay = document.getElementById("overlay");
 
-    startBtn.addEventListener("click", () => {
-      overlay.style.display = "none";
-      this.menus.markStarted();
-      this.controls.lock();
-      this.audioManager.init();
-      this.audioManager.startCorridor(0);
-    });
+    startBtn.addEventListener("click", () => this.beginExperience());
   }
 
   buildWorld() {
@@ -77,6 +83,80 @@ class App {
     this.corridor.setCorridorState(0, this.scene);
     this.corridor.onFlicker = () => this.audioManager.corridorFlicker();
     this.initCorridorStateControls();
+    this.setupMenuShot();
+  }
+
+  // Fondo del menú de inicio
+  setupMenuShot() {
+    if (typeof this.corridor.addMenuDoor !== "function") return; // Corridor.js sin parchear
+    const door = this.corridor.addMenuDoor(false);
+    door.updateMatrixWorld(true);
+
+    let obj = null;
+    door.traverse((c) => {
+      if (!obj && c.userData && c.userData.isCorridorDoor) obj = c;
+    });
+    if (!obj) return;
+    const pivot = obj.parent;
+
+    const center = new THREE.Vector3();
+    pivot.parent.getWorldPosition(center);
+    const side = center.x < 0 ? -1 : 1; // en qué pared quedó la puerta
+
+    const yaw = this.controls.getObject();
+    yaw.position.set(
+      -side * MENU_SHOT.cameraX,
+      MENU_SHOT.cameraY,
+      center.z + MENU_SHOT.dz,
+    );
+    yaw.rotation.set(0, -side * (Math.PI / 2) + MENU_SHOT.yawOffset, 0);
+    this.controls.pitchObject.rotation.set(MENU_SHOT.pitch, 0, 0);
+
+    this.menuDoor = { pivot };
+    this.corridor.menuMode = true; // luces estables mientras se lee el menú
+    document.body.classList.add("is-menu");
+  }
+
+  // "Comenzar": la puerta se abre, se camina hacia ella y, con el fundido, se arranca el recorrido
+  beginExperience() {
+    const overlay = document.getElementById("overlay");
+    overlay.classList.add("is-leaving");
+    setTimeout(() => (overlay.style.display = "none"), 700);
+
+    this.audioManager.init();
+    this.audioManager.startCorridor(0);
+    this.menus.markStarted();
+    this.controls.lock();
+
+    if (!this.menuDoor) {
+      document.body.classList.remove("is-menu");
+      return;
+    }
+    this.isTransitioning = true;
+    this.audioManager.corridorDoorOpen();
+    this.animateDoorAndLoad(this.menuDoor.pivot, {
+      alignView: true,
+      onDone: () => this.finishMenuIntro(),
+    });
+  }
+
+
+  finishMenuIntro() {
+    this.corridor.removeMenuDoor();
+    this.corridor.menuMode = false;
+    this.menuDoor = null;
+    document.body.classList.remove("is-menu");
+
+    const yaw = this.controls.getObject();
+    yaw.position.set(0, 1.6, 0);
+    yaw.rotation.set(0, 0, 0);
+    this.controls.pitchObject.rotation.set(0, 0, 0);
+    yaw.updateMatrixWorld(true);
+    this.camera.updateMatrixWorld(true);
+    if (this.controls.velocity) this.controls.velocity.set(0, 0, 0);
+
+    this.fadeOverlay.style.opacity = "0";
+    this.isTransitioning = false;
   }
 
   initCorridorStateControls() {
@@ -158,7 +238,7 @@ class App {
     return roomIntersects.length > 0 ? roomIntersects[0].object : null;
   }
 
-  animateDoorAndLoad(doorPivot) {
+  animateDoorAndLoad(doorPivot, opts = {}) {
     if (!doorPivot) return;
 
     const targetRot = -Math.PI / 2.2;
@@ -167,20 +247,37 @@ class App {
 
     const yaw = this.controls.getObject();
     const startPos = yaw.position.clone();
+    const pitchObj = this.controls.pitchObject;
+    const startYaw = yaw.rotation.y;
+    const startPitch = pitchObj.rotation.x;
 
-    // Calculamos el centro de la puerta globalmente
+
     const doorCenter = new THREE.Vector3();
     doorPivot.parent.getWorldPosition(doorCenter);
     doorCenter.y = startPos.y;
 
-    // Trazamos una línea perfecta desde el jugador hacia el hueco de la puerta
     const dirToDoor = new THREE.Vector3().subVectors(doorCenter, startPos);
     dirToDoor.y = 0;
+    const doorDist = dirToDoor.length(); // si es ~0 no hay hacia dónde mirar
     dirToDoor.normalize();
 
-    // El jugador da un mínimo paso atrás (20cm) y luego avanza en línea recta (50cm adentro del marco)
-    const stepBackPos = startPos.clone().addScaledVector(dirToDoor, -0.2);
+    //Da un paso atras y luego avanza
+    const stepBackPos = startPos.clone().addScaledVector(dirToDoor, -0.3);
     const stepInPos = doorCenter.clone().addScaledVector(dirToDoor, 0.5);
+
+    const targetYaw = Math.atan2(-dirToDoor.x, -dirToDoor.z);
+    const yawDiff = Math.atan2(
+      Math.sin(targetYaw - startYaw),
+      Math.cos(targetYaw - startYaw),
+    );
+
+    const targetPitch = -Math.min(
+      DOOR_LOOK_MAX_DOWN,
+      Math.atan2(
+        Math.max(0, startPos.y - DOOR_LOOK_Y),
+        Math.max(doorDist, 0.3),
+      ),
+    );
 
     let startTime = null;
 
@@ -196,6 +293,14 @@ class App {
           : 1 - Math.pow(-2 * progress + 2, 3) / 2;
 
       doorPivot.rotation.y = startRot + targetRot * ease;
+
+      if (opts.alignView !== false && doorDist > 0.05) {
+        // la cámara gira gradualmente hacia el centro de la puerta mientras se abre
+        const a = Math.min(1, progress / 0.5);
+        const k = a * a * (3 - 2 * a);
+        yaw.rotation.y = startYaw + yawDiff * k;
+        pitchObj.rotation.x = startPitch + (targetPitch - startPitch) * k;
+      }
 
       if (progress < 0.25) {
         // Paso atrás corto y veloz
@@ -213,7 +318,8 @@ class App {
       } else {
         this.fadeToBlack(() => {
           doorPivot.rotation.y = startRot;
-          this.loadNextRoom();
+          if (opts.onDone) opts.onDone();
+          else this.loadNextRoom();
         });
       }
     };
@@ -385,6 +491,9 @@ class App {
     const startRot = innerDoorPivot.rotation.y;
     const yaw = this.controls.getObject();
     const startPos = yaw.position.clone();
+    const pitchObj = this.controls.pitchObject;
+    const startYaw = yaw.rotation.y;
+    const startPitch = pitchObj.rotation.x;
 
     const doorCenter = new THREE.Vector3();
     innerDoorPivot.parent.getWorldPosition(doorCenter);
@@ -392,10 +501,26 @@ class App {
 
     const dirToDoor = new THREE.Vector3().subVectors(doorCenter, startPos);
     dirToDoor.y = 0;
+    const doorDist = dirToDoor.length(); // si es ~0 no hay hacia dónde mirar
     dirToDoor.normalize();
 
     const stepBackPos = startPos.clone().addScaledVector(dirToDoor, -0.2);
     const stepInPos = doorCenter.clone().addScaledVector(dirToDoor, 0.5);
+
+    // Hacia dónde debe mirar el jugador para ir derecho a la puerta
+    const targetYaw = Math.atan2(-dirToDoor.x, -dirToDoor.z);
+    const yawDiff = Math.atan2(
+      Math.sin(targetYaw - startYaw),
+      Math.cos(targetYaw - startYaw),
+    );
+    // inclinación hacia el centro de la puerta, calculada con la distancia inicial (no cambia al acercarse)
+    const targetPitch = -Math.min(
+      DOOR_LOOK_MAX_DOWN,
+      Math.atan2(
+        Math.max(0, startPos.y - DOOR_LOOK_Y),
+        Math.max(doorDist, 0.3),
+      ),
+    );
 
     let startTime = null;
     let fadeStarted = false;
@@ -411,6 +536,14 @@ class App {
           ? 4 * Math.pow(progress, 3)
           : 1 - Math.pow(-2 * progress + 2, 3) / 2;
       innerDoorPivot.rotation.y = startRot + targetRot * ease;
+
+      if (doorDist > 0.05) {
+        // la cámara gira gradualmente hacia el centro de la puerta
+        const a = Math.min(1, progress / 0.5);
+        const k = a * a * (3 - 2 * a);
+        yaw.rotation.y = startYaw + yawDiff * k;
+        pitchObj.rotation.x = startPitch + (targetPitch - startPitch) * k;
+      }
 
       if (progress < 0.25) {
         const p = progress / 0.25;
@@ -571,6 +704,9 @@ class App {
     requestAnimationFrame(() => this.animate());
     const delta = this.clock.getDelta();
     const elapsedTime = this.clock.getElapsedTime();
+
+    // Durante las cinemáticas (puertas, fundidos) el mouse tampoco gira la cámara
+    this.controls.lookLocked = !!this.isTransitioning;
 
     // 1. Frenamos durante cinemáticas
     const roomLocksMovement = this.currentRoom && this.currentRoom.lockMovement;

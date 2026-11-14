@@ -62,10 +62,7 @@ export class Corridor {
     this.buildCorridor();
   }
 
-  // Textura procedural de pared deteriorada: concreto estucado (#6B7280 del SDD) con
-  // manchas de humedad, chorreaduras, pintura descascarada y grietas.
-  // Devuelve { map, bump }: el bump es un mapa de relieve aparte para que las grietas
-  // y los parches de pintura caída tengan profundidad real bajo las luces.
+  // Textura procedural de pared deteriorada
   createWallTextures() {
     const S = 1024;
     const mk = () => {
@@ -79,7 +76,7 @@ export class Corridor {
     const c = cc.getContext("2d");
     const b = bc.getContext("2d");
 
-    // --- Base ---
+    // Base
     const baseGrad = c.createLinearGradient(0, 0, 0, S);
     baseGrad.addColorStop(0, "#656b77");
     baseGrad.addColorStop(0.6, "#6b7280");
@@ -89,7 +86,7 @@ export class Corridor {
     b.fillStyle = "#808080";
     b.fillRect(0, 0, S, S);
 
-    // --- Micro-grano de concreto ---
+    // Concreto
     for (let i = 0; i < 40000; i++) {
       const x = Math.random() * S;
       const y = Math.random() * S;
@@ -101,7 +98,7 @@ export class Corridor {
       b.fillRect(x, y, 2, 2);
     }
 
-    // --- Moteado grande (irregularidades del estuco) ---
+    // Moteado grande
     for (let i = 0; i < 45; i++) {
       const x = rnd(0, S),
         y = rnd(0, S),
@@ -114,7 +111,7 @@ export class Corridor {
       c.fillRect(x - r, y - r, r * 2, r * 2);
     }
 
-    // --- Manchas de humedad / moho (más marcadas hacia abajo y arriba) ---
+    // Manchas de humedad
     const stain = (x, y, rx, ry, rgb, alpha) => {
       c.save();
       c.translate(x, y);
@@ -157,10 +154,10 @@ export class Corridor {
         rnd(40, 100),
         "170,165,150",
         rnd(0.08, 0.16),
-      ); // salitre claro
+      );
     }
 
-    // --- Chorreaduras verticales ---
+    // Chorreaduras verticales
     for (let i = 0; i < 28; i++) {
       const x = rnd(40, S - 40);
       const y0 = rnd(0, S * 0.5);
@@ -174,9 +171,8 @@ export class Corridor {
       c.fillRect(x, y0, w, len);
     }
 
-    // --- Pintura descascarada (puntual, no generalizada) ---
+    // Pintura descascarada
     const drawPeel = (cx, cy, r) => {
-      // halo de humedad alrededor del parche (suavizado)
       stain(cx, cy, r * 1.4, r * 1.2, "20,22,24", 0.12);
 
       const outer = jaggedPoly(cx, cy, r, rndInt(9, 15), 0.45);
@@ -185,29 +181,24 @@ export class Corridor {
         cy + (y - cy) * rnd(0.3, 0.65),
       ]);
 
-      // sombra proyectada del borde de pintura
       tracePoly(c, outer);
       c.strokeStyle = "rgba(0,0,0,0.4)";
       c.lineWidth = 6;
       c.stroke();
 
-      // capa de yeso/revoque expuesto (más parecida al color de la pared)
       c.fillStyle = "#7d7a72";
       tracePoly(c, outer);
       c.fill();
 
-      // concreto crudo al fondo (menos oscuro)
       c.fillStyle = "#5a5d63";
       tracePoly(c, inner);
       c.fill();
 
-      // borde de pintura curvada (más claro)
       tracePoly(c, outer);
       c.strokeStyle = "rgba(165,170,182,0.6)";
       c.lineWidth = 2.5;
       c.stroke();
 
-      // relieve: el parche está hundido, el borde levantado
       b.fillStyle = "#505050";
       tracePoly(b, outer);
       b.fill();
@@ -221,7 +212,7 @@ export class Corridor {
     };
     for (let i = 0; i < 3; i++)
       drawPeel(rnd(130, S - 130), rnd(130, S - 130), rnd(18, 42));
-    // pequeñas escamas sueltas
+
     for (let i = 0; i < 10; i++) {
       const cx = rnd(40, S - 40),
         cy = rnd(40, S - 40);
@@ -234,7 +225,7 @@ export class Corridor {
       b.fill();
     }
 
-    // --- Grietas (caminata aleatoria con ramificaciones) ---
+    // Grietas
     const drawCrack = (x, y, angle, len, width, depth) => {
       let px = x,
         py = y,
@@ -249,21 +240,18 @@ export class Corridor {
         if (nx < 6 || nx > S - 6 || ny < 6 || ny > S - 6) break;
         w = Math.max(0.7, w * 0.965);
 
-        // reflejo claro del labio de la grieta
         c.strokeStyle = "rgba(255,255,255,0.1)";
         c.lineWidth = w + 2.5;
         c.beginPath();
         c.moveTo(px + 1, py + 1);
         c.lineTo(nx + 1, ny + 1);
         c.stroke();
-        // fisura oscura
         c.strokeStyle = "rgba(6,6,8,0.92)";
         c.lineWidth = w;
         c.beginPath();
         c.moveTo(px, py);
         c.lineTo(nx, ny);
         c.stroke();
-        // relieve hundido
         b.strokeStyle = "#0c0c0c";
         b.lineWidth = w + 1.2;
         b.beginPath();
@@ -291,7 +279,7 @@ export class Corridor {
       );
     }
 
-    // --- Rozaduras en la zona baja (roces de carros / zócalo sucio) ---
+    // Rozaduras
     for (let i = 0; i < 24; i++) {
       const x = rnd(0, S),
         y = rnd(S * 0.75, S);
@@ -299,7 +287,7 @@ export class Corridor {
       c.fillRect(x, y, rnd(40, 160), rnd(2, 8));
     }
 
-    // --- Suciedad acumulada abajo y arriba ---
+    // Suciedad
     const bottomGrime = c.createLinearGradient(0, S * 0.7, 0, S);
     bottomGrime.addColorStop(0, "rgba(0,0,0,0)");
     bottomGrime.addColorStop(1, "rgba(0,0,0,0.35)");
@@ -369,7 +357,7 @@ export class Corridor {
     ctx.fillStyle = gradient;
     ctx.fillRect(0, 0, S, S);
 
-    // Papel tapiz sutil y zócalo de paneles, sin manchas ni grietas.
+    // Papel tapiz
     for (let x = 0; x < S; x += 36) {
       ctx.fillStyle = stripeColor;
       ctx.globalAlpha = 0.16;
@@ -821,7 +809,7 @@ export class Corridor {
     return texture;
   }
 
-  // Genera textura procedural de PISO AJEDREZADO (Checkerboard) con textura de piedra/terrazo
+  // Genera textura procedural de PISO AJEDREZADO
   createCheckerboardFloorTexture(
     lightColor = "#b0ab9f",
     darkColor = "#141619",
@@ -833,7 +821,7 @@ export class Corridor {
     canvas.height = 512;
     const ctx = canvas.getContext("2d");
 
-    const numCols = 4; // 4 columnas a lo ancho del pasillo
+    const numCols = 4;
     const numRows = 4;
     const tileSize = 512 / numCols;
 
@@ -841,11 +829,11 @@ export class Corridor {
       for (let col = 0; col < numCols; col++) {
         const isWhite = (row + col) % 2 === 0;
 
-        // Color base: Blanco/Gris cálido claro vs Gris muy oscuro / Negro
+        // Color base
         ctx.fillStyle = isWhite ? lightColor : darkColor;
         ctx.fillRect(col * tileSize, row * tileSize, tileSize, tileSize);
 
-        // Ruido de textura / piedra porosa sobre cada baldosa
+        // Ruido de textura
         for (let i = 0; i < 600; i++) {
           const rx = col * tileSize + Math.random() * tileSize;
           const ry = row * tileSize + Math.random() * tileSize;
@@ -856,7 +844,6 @@ export class Corridor {
           ctx.fillRect(rx, ry, 2, 2);
         }
 
-        // Borde sutil de separación entre baldosas
         ctx.strokeStyle = borderColor;
         ctx.lineWidth = 2;
         ctx.strokeRect(col * tileSize, row * tileSize, tileSize, tileSize);
@@ -867,7 +854,7 @@ export class Corridor {
     texture.colorSpace = THREE.SRGBColorSpace;
     texture.wrapS = THREE.RepeatWrapping;
     texture.wrapT = THREE.RepeatWrapping;
-    texture.repeat.set(1, 8); // Repetición a lo largo del pasillo
+    texture.repeat.set(1, 8);
     return texture;
   }
 
@@ -878,7 +865,6 @@ export class Corridor {
 
     const wallThickness = 0.08;
 
-    // Tres sets visuales: deteriorado, limpio y limpio con tonos cálidos.
     const wallTextures = [
       this.createWallTextures(),
       this.createHotelWallTextures({
@@ -903,8 +889,8 @@ export class Corridor {
         panelColor: this.theme.woodLight,
       }),
     ];
-    const TILE_W = 2.6; // metros de pared que cubre una repetición de la textura (en horizontal)
-    const TILE_H = 2.8; // alto de pared = una repetición vertical (las manchas y chorreaduras cubren todo el alto)
+    const TILE_W = 2.6; // metros de pared que cubre una repetición de la textura
+    const TILE_H = 2.8; // alto de pared = una repetición vertical
 
     // Cada tramo usa copias de la textura con repeat/offset según su posición real en la pared,
     // así la textura continúa sin cortes entre los tramos que rodean la puerta.
@@ -931,7 +917,7 @@ export class Corridor {
         map: setup(wallTex.map),
         bumpMap: setup(wallTex.bump),
         bumpScale: stateIndex === 0 ? 0.03 : 0.008,
-        color: 0xffffff, // el #6B7280 (SDD) ya está en la textura
+        color: 0xffffff,
         roughness: stateIndex >= 2 ? 0.78 : 0.92,
         metalness: stateIndex >= 2 ? 0.05 : 0.03,
       });
@@ -1004,7 +990,7 @@ export class Corridor {
     // Paredes del segmento
     addLeftWallSegment(0, -length, 0, height);
 
-    // Pared Derecha (la cara visible es la -X; el offset de V se mantiene en 0)
+    // Pared Derecha
     const rightWallMaterials = wallTextures.map((textureSet, stateIndex) =>
       makeWallMaterial(textureSet, length, height, 0, 0, false, stateIndex),
     );
@@ -1042,7 +1028,7 @@ export class Corridor {
       materials: ceilingMaterials,
     });
 
-    // Escombros: pequeños trozos de revoque caído al pie de las paredes
+    // Escombros
     const chipMat = new THREE.MeshStandardMaterial({
       color: 0x8b8578,
       roughness: 0.95,
@@ -1069,7 +1055,6 @@ export class Corridor {
       this.debrisMeshes.push(chip);
     }
 
-    // Conducto metálico central en el techo
     const conduitGeo = new THREE.CylinderGeometry(0.025, 0.025, length, 16);
     const conduitMat = new THREE.MeshStandardMaterial({
       color: 0x2a2f35,
@@ -1092,7 +1077,7 @@ export class Corridor {
       const spotLight = new THREE.SpotLight(0xfff7ed, 0.85);
       spotLight.position.set(0, height - 0.15, z);
       spotLight.target.position.set(0, 0, z);
-      spotLight.angle = Math.PI / 3.8; // Haz ajustado para marcar el parche sobre el ajedrez
+      spotLight.angle = Math.PI / 3.8;
       spotLight.penumbra = 0.6;
       spotLight.distance = 4.2;
       segment.add(spotLight);
@@ -1192,7 +1177,7 @@ export class Corridor {
       let currentSegment;
 
       if (i === 0) {
-        currentSegment = segment; // Usamos el original para el centro
+        currentSegment = segment;
       } else {
         currentSegment = segment.clone(true);
         registerClone(currentSegment);
@@ -1264,13 +1249,9 @@ export class Corridor {
         item.spotLight.intensity = item.baseIntensitySpot;
         item.tubeMesh.material.color.set(0xfffdfa);
       });
-      // if (scene.fog) {
-      //     scene.fog.density = this.defaultFogDensity;
-      //     scene.fog.color.setHex(0x020304);
-      // }
-      // scene.background.setHex(0x020304);
+
       if (scene.fog) {
-        scene.fog.near = 2; // Valores por defecto del estado oscuro
+        scene.fog.near = 2;
         scene.fog.far = 22;
         scene.fog.color.setHex(0x020304);
       }
@@ -1283,7 +1264,6 @@ export class Corridor {
 
     // 35% de chance de spawnear puerta en la pared IZQUIERDA
     if (Math.random() <= 0.35) {
-      // AQUÍ: pasamos this.currentState
       const doorLeft = this.doorFactory.getClone(true, this.currentState);
       doorLeft.traverse((child) => {
         if (child.userData && child.userData.isCorridorDoor)
@@ -1294,7 +1274,6 @@ export class Corridor {
 
     // 35% de chance de spawnear puerta en la pared DERECHA
     if (Math.random() <= 0.35) {
-      // AQUÍ: pasamos this.currentState
       const doorRight = this.doorFactory.getClone(false, this.currentState);
       doorRight.traverse((child) => {
         if (child.userData && child.userData.isCorridorDoor)
@@ -1322,30 +1301,26 @@ export class Corridor {
   }
 
   update(time, cameraZ = 0) {
-    // 1. Lógica del pasillo infinito (Treadmill por distancia geométrica)
+    // Lógica del pasillo infinito
     if (this.segments && this.segments.length > 0) {
-      const totalLength = this.segments.length * this.segmentLength; // ej: 56m con 7 segmentos
+      const totalLength = this.segments.length * this.segmentLength;
       const halfLength = totalLength / 2; // 28m
 
       this.segments.forEach((segment) => {
-        // El centro geométrico real del segmento
         const segmentCenter = segment.position.z - this.segmentLength / 2;
         const dist = segmentCenter - cameraZ;
 
-        // Si quedó más de 28m a nuestras espaldas (+Z), lo mandamos al fondo (-Z)
         if (dist > halfLength) {
           segment.position.z -= totalLength;
           if (this.addRandomDoor) this.addRandomDoor(segment);
-        }
-        // Si quedó más de 28m adelante (-Z), lo mandamos atrás (+Z)
-        else if (dist < -halfLength) {
+        } else if (dist < -halfLength) {
           segment.position.z += totalLength;
           if (this.addRandomDoor) this.addRandomDoor(segment);
         }
       });
     }
 
-    // 2. Lógica de luces (Estado 1 - Transición)
+    // Lógica de luces (Estado 1)
     if (this.currentState === 1) {
       this.flickerLights.forEach((item) => {
         if (time >= item.nextSoftFlickerAt) {
@@ -1364,10 +1339,10 @@ export class Corridor {
 
     if (this.currentState >= 2) return;
 
-    // 3. Lógica de luces (Estado 0 - Opresivo)
+    // Lógica de luces (Estado 0 - Opresivo)
     this.flickerLights.forEach((item, index) => {
       const noise = Math.sin(time * 10 + index * 2) * 0.04;
-      const isFlickerFrame = Math.random() < 0.02;
+      const isFlickerFrame = !this.menuMode && Math.random() < 0.02;
       if (isFlickerFrame && this.onFlicker) this.onFlicker();
       let factor = 1.0 + noise;
       if (isFlickerFrame) factor *= 0.3;
@@ -1376,5 +1351,23 @@ export class Corridor {
       item.spotLight.intensity = item.baseIntensitySpot * factor;
       item.tubeMesh.material.color.setScalar(Math.max(0.3, factor));
     });
+  }
+
+  addMenuDoor(isLeft = false) {
+    const segment = this.segments[Math.floor(this.segments.length / 2)];
+    this.menuSegment = segment;
+    this.removeDoorFromSegment(segment);
+    const door = this.doorFactory.getClone(isLeft, this.currentState);
+    door.traverse((child) => {
+      if (child.userData && child.userData.isCorridorDoor)
+        this.interactables.push(child);
+    });
+    segment.add(door);
+    return door;
+  }
+
+  removeMenuDoor() {
+    if (this.menuSegment) this.removeDoorFromSegment(this.menuSegment);
+    this.menuSegment = null;
   }
 }

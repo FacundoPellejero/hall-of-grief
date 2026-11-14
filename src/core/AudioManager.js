@@ -2,7 +2,7 @@ export class AudioManager {
   constructor() {
     this.ctx = null;
     this.masterGain = null;
-    // Volumen y mute viven acá desde el principio: el menú de inicio los toca antes de init()
+    // Volumen y mute
     this.volume = 1; // 0 a 1 (lo que mueve el deslizador)
     this.muted = false;
     try {
@@ -15,7 +15,7 @@ export class AudioManager {
   init() {
     if (!this.ctx) {
       this.ctx = new (window.AudioContext || window.webkitAudioContext)();
-      // Todo el audio pasa por acá antes de salir a los parlantes
+      // Todo el audio pasa por acá antes de salir a los parlantes para poder controlarlo
       this.masterGain = this.ctx.createGain();
       this.masterGain.connect(this.ctx.destination);
       this._applyMaster(true);
@@ -32,7 +32,7 @@ export class AudioManager {
     if (immediate) {
       this.masterGain.gain.value = g;
     } else {
-      this.masterGain.gain.setTargetAtTime(g, this.ctx.currentTime, 0.05); // sin clics
+      this.masterGain.gain.setTargetAtTime(g, this.ctx.currentTime, 0.05);
     }
   }
 
@@ -55,7 +55,7 @@ export class AudioManager {
     return this.muted;
   }
 
-  // Tono grave disonante (Se desvanece a los 3.5 segundos para no quedar zumbando)
+  // Tono grave disonante (Se desvanece a los 3 segundos para no quedar zumbando)
   playAmbientDissonance(level = 0.05) {
     if (!this.ctx) return;
 
@@ -69,8 +69,8 @@ export class AudioManager {
     osc2.frequency.setValueAtTime(58.7, this.ctx.currentTime);
 
     gain.gain.setValueAtTime(level, this.ctx.currentTime);
-    // Desvanecimiento suave a los 3.5 segundos
-    gain.gain.exponentialRampToValueAtTime(0.0001, this.ctx.currentTime + 3.5);
+    // Desvanecimiento suave a los 3 segundos
+    gain.gain.exponentialRampToValueAtTime(0.0001, this.ctx.currentTime + 3.0);
 
     osc1.connect(gain);
     osc2.connect(gain);
@@ -99,7 +99,7 @@ export class AudioManager {
     osc.stop(this.ctx.currentTime + 0.15);
   }
 
-  // --- SONIDOS SINTETIZADOS DE ANGER ROOM ---
+  // --- ANGER ROOM ---
   playShatter(kind, level = 0.3) {
     if (!this.ctx) return;
     const now = this.ctx.currentTime;
@@ -232,7 +232,6 @@ export class AudioManager {
     master.gain.value = level;
     master.connect(this.masterGain);
 
-    // Cuerpo grave: el triángulo tiene armónicos, así se oye en parlantes chicos
     const o = this.ctx.createOscillator();
     const g = this.ctx.createGain();
     o.type = "triangle";
@@ -260,7 +259,7 @@ export class AudioManager {
     lp.connect(master);
     src.start(now);
 
-    // Clic metálico: le da el "tic" al "tum"
+    // Clic metálico
     const c = this.ctx.createOscillator();
     const cg = this.ctx.createGain();
     c.type = "square";
@@ -273,10 +272,7 @@ export class AudioManager {
     c.stop(now + 0.06);
   }
 
-  // ============================================================
-  // ACEPTACIÓN
-  // ============================================================
-
+  // --- ACCEPTANCE ROOM ---
   // Viento suave del jardín + bus donde se acumula el acorde del memorial
   startGarden() {
     if (!this.ctx || this.garden) return;
@@ -427,7 +423,7 @@ export class AudioManager {
   }
 
   // Al salir al exterior todo se va apagando hasta el silencio
-  fadeOutGarden(seconds = 4) {
+  fadeOutGarden(seconds = 3) {
     if (!this.ctx || !this.garden) return;
     const { bus, nodes } = this.garden;
     const now = this.ctx.currentTime;
@@ -452,21 +448,14 @@ export class AudioManager {
     this.garden = null;
   }
 
-  // ============================================================
-  // NEGACIÓN
-  // ============================================================
-  // Idea: un colchón de tres notas que arranca desafinado (segunda menor + tritono sobre La)
-  // y se acomoda a un acorde de La mayor a medida que se aceptan las inconsistencias.
-  // Encima, eventos esporádicos (tic-tac irregular, notas sueltas con eco tardío, dos
-  // tonos que "pelean") cuyo desajuste baja con la resolución.
-  // Todo vive entre 200 y 3000 Hz a propósito: los parlantes de notebook no reproducen graves.
+  // --- DENIAL ROOM ---
 
   startDenial(level = 1) {
     if (!this.ctx || this.denial) return;
     const ctx = this.ctx;
     const now = ctx.currentTime;
 
-    // Salida con limitador (nada de sobresaltos) y entrada suave
+    // Salida con limitador
     const out = ctx.createGain();
     out.gain.setValueAtTime(0.0001, now);
     out.gain.exponentialRampToValueAtTime(level, now + 2.5);
@@ -479,11 +468,9 @@ export class AudioManager {
     out.connect(limiter);
     limiter.connect(this.masterGain);
 
-    // Bus aparte para el tic-tac "fantasma": se apaga cuando el reloj vuelve a andar
     const ghostBus = ctx.createGain();
     ghostBus.connect(out);
 
-    // Colchón: la respiración (LFO lento) lo hace subir y bajar, así no queda sostenido
     const drone = ctx.createGain();
     drone.gain.value = 0.55;
     drone.connect(out);
@@ -512,7 +499,6 @@ export class AudioManager {
       vg.gain.exponentialRampToValueAtTime(def.gain * 0.05, now + 3);
       lp.connect(vg);
       vg.connect(drone);
-      // fundamental triangular + octava senoidal (para que se oiga en parlantes chicos)
       const oscs = [
         { type: "triangle", mult: 1, amp: 1 },
         { type: "sine", mult: 2, amp: 0.35 },
@@ -548,7 +534,6 @@ export class AudioManager {
     this._denialSchedule();
   }
 
-  // Aplica la "resolución" r (0 = tenso, 1 = acorde de La mayor) al colchón
   _denialApply(r) {
     const d = this.denial;
     if (!d) return;
@@ -560,9 +545,9 @@ export class AudioManager {
       v.oscs.forEach(({ o, mult }) =>
         o.frequency.setTargetAtTime(f * mult, t, 1.2),
       );
-      v.lp.frequency.setTargetAtTime(1500 - 600 * r, t, 1.5); // más cálido al resolverse
+      v.lp.frequency.setTargetAtTime(1500 - 600 * r, t, 1.5);
     });
-    d.lfoGain.gain.setTargetAtTime(0.35 * (1 - 0.6 * r), t, 1.5); // respira menos
+    d.lfoGain.gain.setTargetAtTime(0.35 * (1 - 0.6 * r), t, 1.5);
   }
 
   _denialDest(pan = 0, bus = null) {
@@ -580,7 +565,6 @@ export class AudioManager {
     return p;
   }
 
-  // Nota suave tipo marimba (fundamental + armónico), audible en parlantes chicos
   _denialTone(freq, t, level, dur, pan = 0) {
     const ctx = this.ctx;
     const dest = this._denialDest(pan);
@@ -602,7 +586,6 @@ export class AudioManager {
     });
   }
 
-  // Tic / toc: golpe de ruido filtrado (para parlantes) + cuerpito de madera
   _denialTick(t, tock = false, level = 0.06, pan = 0, bus = null) {
     const ctx = this.ctx;
     const dest = this._denialDest(pan, bus);
@@ -640,7 +623,7 @@ export class AudioManager {
   _denialSchedule() {
     const d = this.denial;
     if (!d) return;
-    // Más espaciado a medida que se resuelve
+
     const wait = (2200 + Math.random() * 2800) * (1 + d.r * 0.8);
     d.timer = setTimeout(() => {
       if (!this.denial) return;
@@ -660,7 +643,6 @@ export class AudioManager {
     const kind = pool[Math.floor(Math.random() * pool.length)];
 
     if (kind === "ticks") {
-      // Tic-tac irregular: el pulso se tambalea (jitter) y se ordena con r
       const n = 3 + Math.floor(Math.random() * 4);
       let t = now;
       for (let i = 0; i < n; i++) {
@@ -668,7 +650,6 @@ export class AudioManager {
         t += 0.8 + (Math.random() * 2 - 1) * 0.45 * (1 - r);
       }
     } else if (kind === "blip") {
-      // Nota suelta + eco que llega tarde y desafinado; al resolverse el eco se acorta y se afina
       const good = [0, 4, 7, 9, 12]; //  La Do# Mi Fa# La
       const bad = [1, 6, 11, 13, 18]; // Si♭ Mi♭ Sol# Si♭ Mi♭ (contra La)
       const set = Math.random() < 1 - r ? bad : good;
@@ -707,7 +688,6 @@ export class AudioManager {
     }
   }
 
-  // Un objeto desajustado fue aceptado: kind = "clock" | "frame" | "drawer"
   denialFound(kind) {
     const d = this.denial;
     if (!d || d.found.has(kind)) return;
@@ -715,10 +695,8 @@ export class AudioManager {
     const ctx = this.ctx;
     const now = ctx.currentTime;
 
-    // 1) Golpecito de "encaje"
     this._denialTick(now, true, 0.12);
 
-    // 2) Nota que arranca desafinada (casi un semitono abajo) y se acomoda: La, Do#, Mi
     const target = { clock: 440, frame: 554.37, drawer: 659.25 }[kind] || 440;
     const o = ctx.createOscillator();
     const g = ctx.createGain();
@@ -733,7 +711,6 @@ export class AudioManager {
     o.start(now + 0.05);
     o.stop(now + 2.5);
 
-    // 3) Resolución del colchón (reloj + cuadro = 100%; el cajón es opcional y no cuenta)
     if (kind === "clock") {
       d.clockOk = true;
       d.ghostBus.gain.setTargetAtTime(0, now, 0.1);
@@ -744,7 +721,6 @@ export class AudioManager {
     }
   }
 
-  // Un tic-tac "real", sincronizado con el segundero del reloj cuando vuelve a andar
   denialClockTick() {
     const d = this.denial;
     if (!d) return;
@@ -777,14 +753,6 @@ export class AudioManager {
     );
   }
 
-  // ============================================================
-  // IRA
-  // ============================================================
-  // Fases: tense (grave + golpes) -> silent (la pared se aleja) -> under (vuelve "bajo el
-  // agua", con filtro) -> released (se rompió todo: se acalla y se armoniza).
-  // Los graves usan sierras en 110-220 Hz: los parlantes de notebook no reproducen la
-  // fundamental, pero sí sus armónicos, y el oído "completa" el grave.
-
   startAnger(level = 1) {
     if (!this.ctx || this.anger) return;
     const ctx = this.ctx;
@@ -802,13 +770,11 @@ export class AudioManager {
     out.connect(limiter);
     limiter.connect(this.masterGain);
 
-    // Filtro maestro: abierto al principio; "bajo el agua" después de la pared
     const lp = ctx.createBiquadFilter();
     lp.type = "lowpass";
     lp.frequency.value = 6000;
     lp.Q.value = 0.7;
     lp.connect(out);
-    // Ondulación lenta del filtro (solo se nota bajo el agua)
     const wobble = ctx.createOscillator();
     const wobbleGain = ctx.createGain();
     wobble.frequency.value = 0.3;
@@ -817,12 +783,10 @@ export class AudioManager {
     wobbleGain.connect(lp.frequency);
     wobble.start(now);
 
-    // bus: lo que controla el silencio total
     const bus = ctx.createGain();
     bus.gain.value = 1;
     bus.connect(lp);
 
-    // Colchón grave con respiración leve
     const drone = ctx.createGain();
     drone.gain.value = 0.6;
     drone.connect(bus);
@@ -835,7 +799,6 @@ export class AudioManager {
     lfo.start(now);
 
     const nodes = [lfo, wobble];
-    // from/to: semitonos sobre La2 (110 Hz); g0/g1: nivel tenso -> resuelto
     const defs = [
       { from: 0, to: 0, g0: 0.5, g1: 0.5, type: "sawtooth" }, //   La fijo
       { from: 1, to: 7, g0: 0.35, g1: 0.3, type: "sawtooth" }, //  Si♭ -> Mi  (2ª menor -> quinta)
@@ -892,7 +855,7 @@ export class AudioManager {
       v.oscs.forEach((o) => o.frequency.setTargetAtTime(f, t, 1.5));
       const g = (v.def.g0 + (v.def.g1 - v.def.g0) * r) * 0.045;
       v.vg.gain.setTargetAtTime(Math.max(g, 0.0001), t, 1.5);
-      v.vlp.frequency.setTargetAtTime(800 - 300 * r, t, 1.5); // más redondo al resolver
+      v.vlp.frequency.setTargetAtTime(800 - 300 * r, t, 1.5);
     });
   }
 
@@ -913,7 +876,6 @@ export class AudioManager {
     }, wait);
   }
 
-  // Golpe grave: cuerpo triangular que cae + ruido corto + clic (se oye en parlantes chicos)
   _angerHit(t, level) {
     const ctx = this.ctx;
     const bus = this.anger.bus;
@@ -965,7 +927,6 @@ export class AudioManager {
     d.bus.gain.setTargetAtTime(1 - k, this.ctx.currentTime, 0.08);
   }
 
-  // Silencio total mientras la pared se aleja
   angerSilence() {
     const d = this.anger;
     if (!d || d.phase === "released") return;
@@ -973,7 +934,6 @@ export class AudioManager {
     d.bus.gain.setTargetAtTime(0, this.ctx.currentTime, 0.12);
   }
 
-  // La pared terminó de deformarse: vuelve el sonido, pero "bajo el agua"
   angerUnderwater() {
     const d = this.anger;
     if (!d || d.phase !== "silent") return;
@@ -986,7 +946,6 @@ export class AudioManager {
     d.bus.gain.setTargetAtTime(0.9, t + 0.3, 1.5); // vuelve de a poco
   }
 
-  // Se rompió todo: se calman los golpes, se abre el agua y el colchón se armoniza
   angerRelease() {
     const d = this.anger;
     if (!d || d.phase === "released") return;
@@ -1027,21 +986,13 @@ export class AudioManager {
     );
   }
 
-  // Tic-tac del reloj que vuelve a andar: el MISMO sonido en Negación e Ira
   playClockTick(level = 0.03) {
     if (!this.ctx) return;
     this._clockAlt = !this._clockAlt;
     this._denialTick(this.ctx.currentTime, this._clockAlt, level);
   }
 
-  // ============================================================
-  // NEGOCIACIÓN
-  // ============================================================
-  // La tensión NO es un acorde sostenido (cansa). Son "respiros" de acordes abiertos sin
-  // tercera (Asus4, Asus2, cuartas apiladas): entran lento, se apagan solos y dejan silencio
-  // entre uno y otro. Se alternan para que el oído no se clave en uno.
-  // La habitación que se cierra sube la "presión": el tono sube un poco (hasta ~60 cents),
-  // el brillo aumenta y los respiros se acercan entre sí.
+  // --- BARGAIN ROOM ---
   // Resolución: la cuarta (Re) cae a la tercera (Do#) y queda La mayor: una suspensión 4-3.
 
   startBargain(level = 1) {
@@ -1061,7 +1012,6 @@ export class AudioManager {
     out.connect(limiter);
     limiter.connect(this.masterGain);
 
-    // Filtro de los acordes (los tintineos salen directo, sin filtrar)
     const lp = ctx.createBiquadFilter();
     lp.type = "lowpass";
     lp.frequency.value = 1100 + 1300 * 0.25;
@@ -1143,7 +1093,7 @@ export class AudioManager {
     const wait =
       d.phase === "resolved"
         ? 10000 + Math.random() * 5000
-        : 7500 - 3700 * d.t + Math.random() * 2500; // más tensión = respiros más seguidos
+        : 7500 - 3700 * d.t + Math.random() * 2500;
     d.timer = setTimeout(() => {
       const b = this.bargain;
       if (!b) return;
@@ -1173,9 +1123,7 @@ export class AudioManager {
     );
   }
 
-  // Llaves que traquetean contra algo cerrado: golpecitos metálicos apagados, graves para
-  // un tintineo, que caen de tono, se espacian y se debilitan hasta apagarse. Sin brillo
-  // ni subidas: no hay premio, la puerta no cede.
+  // Llaves que traquetean contra algo cerrado
   _keysJingle(t, level = 0.03, pan = 0, n = 4) {
     const ctx = this.ctx;
     const dest = this._denialDest(pan);
@@ -1221,7 +1169,7 @@ export class AudioManager {
     }
   }
 
-  // La habitación rechaza la oferta: tintineo + golpe sordo, y la presión sube
+  // La habitación rechaza la oferta
   bargainReject(fails, max = 4) {
     const d = this.bargain;
     if (!d || d.phase !== "searching") return;
@@ -1243,11 +1191,9 @@ export class AudioManager {
     d.t = Math.min(1, 0.25 + 0.75 * (fails / max));
     this._bargainApply();
     clearTimeout(d.soon);
-    // un respiro enseguida, ya con el tono más alto, para que se note que se cierra
     d.soon = setTimeout(() => this._bargainSwell(), 500);
   }
 
-  // "No hay tratos posibles": un momento de silencio antes de empezar a soltar
   bargainLettingGo() {
     const d = this.bargain;
     if (!d || d.phase !== "searching") return;
@@ -1255,7 +1201,6 @@ export class AudioManager {
     d.quietUntil = performance.now() + 4500;
   }
 
-  // Cada objeto soltado en la mesa: golpecito + nota del acorde final; la tensión baja
   bargainPlace(n) {
     const d = this.bargain;
     if (!d) return;
@@ -1272,7 +1217,6 @@ export class AudioManager {
     }
   }
 
-  // El cuarto objeto: la cuarta (Re) cae a la tercera (Do#) y el acorde queda resuelto
   bargainResolve() {
     const d = this.bargain;
     if (!d || d.phase === "resolved") return;
@@ -1340,9 +1284,7 @@ export class AudioManager {
     );
   }
 
-  // ============================================================
-  // PASILLO (4 estados: 0 opresivo -> 3 cálido)
-  // ============================================================
+  // --- PASILLO ---
   // Estado 0: silencio + zumbido fluorescente por episodios + crujidos sincronizados con el
   //           parpadeo + pasos duros con eco. Sin capa tonal.
   // Estado 1: el zumbido se espacia y se debilita; entra la 1ª capa armónica (La + Mi, quinta
@@ -1383,7 +1325,7 @@ export class AudioManager {
     const dry = ctx.createGain();
     dry.connect(out);
 
-    // Eco de pasillo: reverb por convolución con una respuesta oscura y larga
+    // Eco de pasillo
     const reverb = ctx.createConvolver();
     reverb.buffer = this._corrImpulse(1.6);
     const send = ctx.createGain();
@@ -1396,7 +1338,6 @@ export class AudioManager {
 
     const nodes = [];
 
-    // --- Capas armónicas: triángulo + octava senoidal por nota, con respiración lenta
     const padBus = ctx.createGain();
     padBus.gain.value = 0.8;
     padBus.connect(dry);
@@ -1454,7 +1395,6 @@ export class AudioManager {
     };
     this._corrLast = from;
 
-    // Primer episodio de zumbido enseguida (el estado 0 arranca en silencio y zumba)
     this.corridor.soon = setTimeout(() => {
       if (this.corridor && this.corridor.state === 0) this._corrHumEpisode();
     }, 2500);
@@ -1475,7 +1415,7 @@ export class AudioManager {
       const d = buf.getChannelData(ch);
       let lp = 0;
       for (let i = 0; i < len; i++) {
-        lp += 0.3 * (Math.random() * 2 - 1 - lp); // cola oscura
+        lp += 0.3 * (Math.random() * 2 - 1 - lp);
         d[i] = lp * Math.pow(1 - i / len, 3.2) * 2;
       }
     }
@@ -1564,8 +1504,7 @@ export class AudioManager {
     );
   }
 
-  // Un paso: talón (ruido filtrado) + cuerpo corto, con eco de pasillo.
-  // El estado lo ablanda: duro y seco en el 0, amortiguado en el 3.
+  // Pasos
   corridorStep() {
     const d = this.corridor;
     if (!d) return;

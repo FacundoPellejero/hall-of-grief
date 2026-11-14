@@ -14,26 +14,45 @@
     <link rel="stylesheet" href="./src/menus.css" />
   </head>
   <body>
-    <!-- Menú de inicio: aviso sensible, accesibilidad y botón de comenzar -->
+    <!-- Menú de inicio -->
     <div
       id="overlay"
-      class="hog-menu"
+      class="hog-menu hog-start"
       role="dialog"
       aria-modal="true"
       aria-labelledby="start-title"
     >
-      <div class="hog-card">
-        <h1 id="start-title" class="hog-title">Hall of Grief</h1>
-        <p class="hog-lede">
-          Un recorrido por las etapas del duelo. No hay que ganar nada: se
-          avanza a tu ritmo.
+      <header class="hog-start__top">
+        <p class="hog-start__eyebrow">Una experiencia sobre el duelo</p>
+        <h1 id="start-title" class="hog-start__title">Hall of Grief</h1>
+        <p class="hog-start__warning" role="note">
+          Contenido sensible. Podés pausar en cualquier momento con la tecla
+          Esc.
         </p>
-        <p class="hog-warning" role="note">
-          Contenido sensible: esta experiencia trata sobre el duelo. Podés
-          pausarla en cualquier momento con la tecla Esc.
-        </p>
+      </header>
 
-        <section class="hog-options" aria-labelledby="start-options">
+      <div class="hog-start__bottom">
+        <nav id="start-main" aria-label="Menú principal">
+          <button id="btn-start" class="hog-start__item" type="button">
+            Comenzar
+          </button>
+          <button
+            id="btn-options"
+            class="hog-start__item"
+            type="button"
+            aria-expanded="false"
+            aria-controls="start-options-panel"
+          >
+            Opciones
+          </button>
+        </nav>
+
+        <section
+          id="start-options-panel"
+          class="hog-start__options"
+          aria-labelledby="start-options"
+          hidden
+        >
           <h2 id="start-options" class="hog-h2">Accesibilidad</h2>
           <div class="hog-row">
             <label for="vol-start">Volumen</label>
@@ -60,22 +79,24 @@
               >No</span
             >
           </button>
+          <button
+            id="btn-options-back"
+            class="hog-start__item hog-start__item--small"
+            type="button"
+          >
+            Volver
+          </button>
         </section>
 
-        <div class="hog-actions">
-          <button id="btn-start" class="hog-btn hog-btn--primary" type="button">
-            Comenzar
-          </button>
-        </div>
         <p class="hog-hint">
           W A S D para moverte · mouse para mirar · clic para interactuar · Esc
-          para pausar. Se recomiendan auriculares, pero también se escucha con
-          parlantes.
+          para pausar.<br />
+          Se recomiendan auriculares, pero también se escucha con parlantes.
         </p>
       </div>
     </div>
 
-    <!-- Menú de pausa: aparece al soltar el pointer lock (Esc) -->
+    <!-- Menú de pausa -->
     <div
       id="pause-menu"
       class="hog-menu"

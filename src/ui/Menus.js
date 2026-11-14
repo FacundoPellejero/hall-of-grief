@@ -1,5 +1,4 @@
 // Menú de inicio + menú de pausa + opciones de accesibilidad (volumen y silencio).
-// El AudioManager guarda el estado de volumen/mute; acá solo se refleja en los dos menús.
 
 export class Menus {
   constructor(audio, controls) {
@@ -20,16 +19,43 @@ export class Menus {
     this.muteButtons = [...document.querySelectorAll("[data-mute]")];
 
     this.bindAudioControls();
+    this.bindStartMenu();
     this.bindPause();
     this.syncAudioUI();
   }
 
-  // ---------- Accesibilidad: volumen y silencio (inicio y pausa comparten estado) ----------
+  // Menú de inicio
+  bindStartMenu() {
+    const main = document.getElementById("start-main");
+    const panel = document.getElementById("start-options-panel");
+    const open = document.getElementById("btn-options");
+    const back = document.getElementById("btn-options-back");
+    if (!main || !panel || !open || !back) return;
+
+    open.addEventListener("click", () => {
+      main.hidden = true;
+      panel.hidden = false;
+      open.setAttribute("aria-expanded", "true");
+      const first = panel.querySelector("[data-volume]");
+      if (first) first.focus();
+    });
+    back.addEventListener("click", () => {
+      panel.hidden = true;
+      main.hidden = false;
+      open.setAttribute("aria-expanded", "false");
+      open.focus();
+    });
+    document.addEventListener("keydown", (e) => {
+      if (e.key === "Escape" && !panel.hidden) back.click();
+    });
+  }
+
+  // Accesibilidad
   bindAudioControls() {
     this.sliders.forEach((slider) => {
       slider.addEventListener("input", () => {
         this.audio.setVolume(slider.value / 100);
-        // Si estaba silenciado y el jugador mueve el volumen, es que quiere oír
+        // Si estaba silenciado y el jugador mueve el volumen se desmutea
         if (this.audio.muted && Number(slider.value) > 0)
           this.audio.toggleMute(false);
         this.syncAudioUI();
@@ -67,9 +93,8 @@ export class Menus {
     });
   }
 
-  // ---------- Pausa ----------
+  // Pausa
   bindPause() {
-    // Esc lo captura el navegador al salir del pointer lock, así que escuchamos el cambio de lock
     document.addEventListener("pointerlockchange", () => {
       const locked = document.pointerLockElement != null;
       if (locked) {
@@ -85,7 +110,6 @@ export class Menus {
       this.showPause();
     });
 
-    // El navegador a veces rechaza volver a bloquear justo después de Esc
     document.addEventListener("pointerlockerror", () => {
       if (!this.$pause.hidden) {
         this.$note.textContent = "Esperá un momento y volvé a intentar.";
@@ -97,7 +121,7 @@ export class Menus {
       this.controls.lock();
     });
 
-    // Reiniciar pide una segunda confirmación para no perder el recorrido por un clic
+    // Reiniciar pide una segunda confirmación
     const label = this.$restart.textContent;
     let timer = null;
     this.$restart.addEventListener("click", () => {
@@ -107,7 +131,7 @@ export class Menus {
       }
       this.$restart.dataset.armed = "1";
       this.$restart.textContent =
-        "¿Seguro? Se pierde el recorrido. Clic de nuevo para reiniciar";
+        "¿Seguro? Vas a perder tu recorrido. Clic de nuevo para reiniciar";
       timer = setTimeout(() => this.resetRestart(label), 4000);
     });
     this._resetRestart = () => {
@@ -148,7 +172,6 @@ export class Menus {
   // Soltar el pointer lock a propósito (pantalla final, memorial) sin que salte la pausa
   unlockQuietly() {
     if (document.pointerLockElement) {
-      // Solo si hay lock activo: si no, no habrá evento y el flag taparía un Esc real
       this.suppressPause = true;
       setTimeout(() => (this.suppressPause = false), 600);
     }

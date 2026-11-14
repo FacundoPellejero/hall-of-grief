@@ -1,4 +1,4 @@
-/* Menús de Hall of Grief: inicio y pausa. Sobrios, sans-serif, alto contraste. */
+/* Menús de inicio y pausa */
 
 :root {
   --hog-veil: rgba(6, 8, 10, 0.9);
@@ -14,7 +14,8 @@
     sans-serif;
 }
 
-.hog-menu[hidden] {
+.hog-menu[hidden],
+#overlay [hidden] {
   display: none !important;
 }
 
@@ -233,7 +234,9 @@
 
 /* En pausa se oculta la retícula y el texto flotante para no mezclar capas */
 body.is-paused #crosshair,
-body.is-paused #ui-prompt {
+body.is-paused #ui-prompt,
+body.is-menu #crosshair,
+body.is-menu #ui-prompt {
   opacity: 0;
 }
 
@@ -257,14 +260,116 @@ body.is-paused #ui-prompt {
   }
 }
 
-/* Por si style.css todavía tiene reglas viejas para #btn-start (mismo id que usa main.js) */
-#btn-start.hog-btn {
-  font-family: var(--hog-font);
+/* ================= Menú de inicio ================= */
+#overlay.hog-menu.hog-start {
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: space-between;
+  padding: 7vh 6vw;
+  background: linear-gradient(
+    90deg,
+    rgba(5, 7, 9, 0.82) 0%,
+    rgba(5, 7, 9, 0.5) 40%,
+    rgba(5, 7, 9, 0) 72%
+  );
+  backdrop-filter: none;
+  transition: opacity 0.7s ease;
+}
+#overlay.hog-menu.hog-start.is-leaving {
+  opacity: 0;
+  pointer-events: none;
+}
+
+:is(#overlay) .hog-start__eyebrow {
+  margin: 0 0 6px;
   font-size: 1rem;
-  font-weight: 400;
-  letter-spacing: normal;
+  letter-spacing: 0.08em;
+  color: var(--hog-muted);
+}
+:is(#overlay) .hog-start__title {
+  margin: 0;
+  font-family: var(--hog-font);
+  font-size: clamp(2.6rem, 6.5vw, 4.6rem);
+  font-weight: 300;
+  line-height: 1.05;
+  letter-spacing: 0.04em;
+  color: var(--hog-text);
+}
+:is(#overlay) .hog-start__warning {
+  max-width: 34ch;
+  margin: 18px 0 0;
+  padding-left: 12px;
+  font-size: 0.9rem;
+  line-height: 1.5;
+  color: var(--hog-text);
+  border-left: 3px solid var(--hog-accent);
+}
+
+:is(#overlay) .hog-start__bottom {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 18px;
+  max-width: 420px;
+}
+:is(#overlay) #start-main {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+}
+
+#overlay .hog-start__item {
+  display: block;
+  padding: 2px 0;
+  margin: 0;
+  font-family: var(--hog-font);
+  font-size: clamp(1.7rem, 3.4vw, 2.4rem);
+  font-weight: 300;
+  letter-spacing: 0.03em;
+  line-height: 1.2;
+  text-align: left;
   text-transform: none;
   color: var(--hog-text);
+  background: none;
+  border: 0;
   box-shadow: none;
   text-shadow: none;
+  cursor: pointer;
+  transition:
+    color 0.2s ease,
+    transform 0.2s ease;
+}
+#overlay .hog-start__item:hover {
+  color: var(--hog-accent);
+  transform: translateX(6px);
+}
+#overlay .hog-start__item--small {
+  margin-top: 8px;
+  font-size: 1.2rem;
+  color: var(--hog-muted);
+}
+
+:is(#overlay) .hog-start__options {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 14px;
+  width: min(380px, 80vw);
+}
+:is(#overlay) .hog-start__options .hog-row {
+  margin-bottom: 0;
+}
+:is(#overlay) .hog-start__options .hog-toggle {
+  align-self: flex-start;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  #overlay.hog-menu.hog-start,
+  #overlay .hog-start__item {
+    transition: none;
+  }
+  #overlay .hog-start__item:hover {
+    transform: none;
+  }
 }

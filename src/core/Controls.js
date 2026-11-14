@@ -6,6 +6,7 @@ export class FirstPersonControls {
     this.domElement = domElement;
 
     this.isLocked = false;
+    this.lookLocked = false; // true = el mouse no gira la cámara (cinemáticas)
     this.moveForward = false;
     this.moveBackward = false;
     this.moveLeft = false;
@@ -17,7 +18,7 @@ export class FirstPersonControls {
     this.pitchObject = new THREE.Object3D();
     this.yawObject = new THREE.Object3D();
 
-    this.yawObject.position.set(0, 1.6, 0); // Altura de ojos humanos
+    this.yawObject.position.set(0, 1.6, 0); // Altura de vision
     this.yawObject.add(this.pitchObject);
     this.pitchObject.add(this.camera);
 
@@ -26,7 +27,7 @@ export class FirstPersonControls {
 
   initListeners() {
     document.addEventListener("mousemove", (e) => {
-      if (!this.isLocked) return;
+      if (!this.isLocked || this.lookLocked) return;
       const movementX = e.movementX || 0;
       const movementY = e.movementY || 0;
 
@@ -43,12 +44,9 @@ export class FirstPersonControls {
     document.addEventListener("keydown", (e) => this.onKeyDown(e));
     document.addEventListener("keyup", (e) => this.onKeyUp(e));
 
-    // El navegador suelta el pointer lock por su cuenta (Esc, cambiar de pestaña) sin llamar
-    // a unlock(): sin esto isLocked quedaba en true y la cámara seguía girando con el mouse.
     document.addEventListener("pointerlockchange", () => {
       this.isLocked = document.pointerLockElement === this.domElement;
       if (!this.isLocked) {
-        // soltamos las teclas para no quedar "caminando" al pausar
         this.moveForward =
           this.moveBackward =
           this.moveLeft =
@@ -57,7 +55,6 @@ export class FirstPersonControls {
         this.velocity.set(0, 0, 0);
       }
     });
-    // Si el navegador rechaza el lock (por ejemplo, justo después de Esc)
     document.addEventListener("pointerlockerror", () => {
       this.isLocked = false;
     });
