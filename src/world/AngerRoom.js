@@ -1,8 +1,6 @@
 import * as THREE from "three";
 
-/* ============================================================
-   CONFIG: para ajustar rápido
-   ============================================================ */
+//Variables de configuración
 const CFG = {
   startDepth: 6.0,
   maxDepth: 29.0,
@@ -20,7 +18,7 @@ const CFG = {
   keyAngle: 0.45, // inclinación máxima de las palabras clave (rad)
   ghostAlpha: 0.1, // qué tan visible queda el rastro de las frases al terminar el estiramiento
 
-  // ALIVIO: cómo se transforma la sala cuando rompiste todo (0 = igual que antes, 1 = terminado)
+  //(0 = igual que antes, 1 = terminado)
   relief: {
     ambient: 0.2, // luz ambiente extra al final
     ambientColor: 0xffb89a, // color de esa luz (cálido)
@@ -53,9 +51,7 @@ const LAYOUT = [
   { type: "box", side: -1, dist: 26.5, phrase: "Tu voz", keep: true },
 ];
 
-/* ============================================================
-   HELPERS
-   ============================================================ */
+// helpers
 const rnd = (a, b) => a + Math.random() * (b - a);
 const smooth = (e0, e1, x) => {
   const t = THREE.MathUtils.clamp((x - e0) / (e1 - e0), 0, 1);
@@ -108,9 +104,7 @@ const MUG = profile([
   [0.001, 0.012],
 ]);
 
-/* ============================================================
-   TEXTURAS
-   ============================================================ */
+//Texturas
 function makeTagTexture(text, warm) {
   const w = 768,
     h = 144;
@@ -203,10 +197,7 @@ const hitBox = (w, h, d, x, y, z) => {
   return m;
 };
 
-/* ============================================================
-   PARED DEL FONDO: ondas de frases + palabras clave 
-   Mismo diseño que la página de pruebas: se dibuja en el espacio y se escala a la textura, así la semilla da exactamente el mismo resultado.
-   ============================================================ */
+// Pared de fondo
 const WALL_W = 1100,
   WALL_H = 1350;
 const WALL_ANTON = '"Anton", Impact, sans-serif';
@@ -306,7 +297,7 @@ function wallWave(c, text, y0, amp, lam, phi, x0, alpha, px) {
   }
 }
 
-// Dibuja ondas densas (Anton, tenues) y las palabras clave (Special Elite, rojo) sobre un canvas transparente
+// Dibuja ondas densas
 function drawWallLayer(c, seed, keyAngle) {
   const R = mulberry32(seed);
   const rows = 14,
@@ -358,9 +349,7 @@ function drawWallLayer(c, seed, keyAngle) {
   }
 }
 
-/* ============================================================
-   SALA DE LA IRA
-   ============================================================ */
+// Constructor de la habitación
 export class AngerRoom {
   constructor(
     scene,
@@ -374,9 +363,9 @@ export class AngerRoom {
     this.doorFactory = doorFactory;
     this.initialState = initialState;
     this.camera = camera;
-    this.audio = audio; // AudioManager
+    this.audio = audio;
     this.lockMovement = false;
-    this.say = say || (() => {}); // mensajes en pantalla (showPrompt de main.js)
+    this.say = say || (() => {});
     this.interactables = [];
     this.isDoorUnlocked = false;
 
@@ -421,7 +410,7 @@ export class AngerRoom {
     this.redCol = new THREE.Color(0xff4a2a);
     this.warmCol = new THREE.Color(0xffb066);
 
-    // Colores base y de alivio (la sala se transforma cuando rompés todo)
+    // Colores base y de alivio
     this.baseAmbientCol = new THREE.Color(0x4a0a0a);
     this.wallBase = new THREE.Color(0x2a0a0a);
     this.floorBase = new THREE.Color(0x1a0505);
@@ -440,7 +429,7 @@ export class AngerRoom {
 
     this.initShardAssets();
 
-    // Las fuentes de Google se cargan async: si no estaban listas al dibujar la pared, la redibujamos
+    // Las fuentes de Google se cargan async
     const fontsWereReady = AngerRoom.fontsLoaded();
     this.buildRoom();
     if (!fontsWereReady)
@@ -478,20 +467,19 @@ export class AngerRoom {
     return CFG.xLimit;
   }
 
-  /* ---------- Pared del fondo ---------- */
+  // Pared del fondo
   createBackWallTextures() {
-    // Misma proporción que la pared (2.2 x 2.7) para que el texto no se deforme
     const CW = 1536,
       CH = Math.round((CW * 2.7) / 2.2);
     const k = CW / WALL_W;
 
-    // 1) Capa de frases sobre transparente
+    // Capa de frases sobre transparente
     const layer = canvasOf(CW, CH);
     const lc = layer.getContext("2d");
     lc.scale(k, k);
     drawWallLayer(lc, CFG.wallSeed, CFG.keyAngle);
 
-    // 2) Textura inicial: fondo oscuro + frases
+    // Textura inicial: fondo oscuro + frases
     const cv = canvasOf(CW, CH);
     const c = cv.getContext("2d");
     const grad = c.createLinearGradient(0, 0, 0, CH);
@@ -502,9 +490,7 @@ export class AngerRoom {
     c.fillRect(0, 0, CW, CH);
     c.drawImage(layer, 0, 0);
 
-    // 3) Textura final (rastro): blanco con la silueta de las frases apenas más oscura.
-    //    Se multiplica por el color de la pared, así el rastro queda tono sobre tono
-    //    y sigue el cambio de color del alivio.
+    // Textura final
     const GW = 768,
       GH = Math.round((GW * CH) / CW);
     const sil = canvasOf(GW, GH);
@@ -536,7 +522,6 @@ export class AngerRoom {
     old.forEach((x) => x && x.dispose());
   }
 
-  /* ---------- Construcción ---------- */
   buildRoom() {
     const doorX = 0;
 
@@ -665,9 +650,7 @@ export class AngerRoom {
     this.ceiling.position.set(0, H, centerZ);
   }
 
-  /* ============================================================
-       OBJETOS
-       ============================================================ */
+  // Objetos
   spawnObjects() {
     for (const def of LAYOUT) this.addEntry(def);
   }
@@ -1007,9 +990,7 @@ export class AngerRoom {
     };
   }
 
-  /* ============================================================
-       ROMPER / FRAGMENTOS
-       ============================================================ */
+  // Fragmentos
   initShardAssets() {
     this.shardGeos = [];
     for (let i = 0; i < 6; i++) {
@@ -1121,7 +1102,7 @@ export class AngerRoom {
     }
   }
 
-  /* ---------- INTERACCIONES Y MENSAJES ---------- */
+  // Interacción
   breakEntry(entry, uiPromptCallback) {
     entry.broken = true;
     entry.brokenAt = this.lastTime ?? 0;
@@ -1205,9 +1186,7 @@ export class AngerRoom {
     this.breakEntry(entry, uiPromptCallback);
   }
 
-  /* ============================================================
-       RELOJ 
-       ============================================================ */
+  // Reloj
   createWoodTexture(base) {
     const S = 256;
     const cv = canvasOf(S, S);
@@ -1406,9 +1385,7 @@ export class AngerRoom {
     secondHand.rotation.z = -((total % 60) / 60) * TAU;
   }
 
-  /* ============================================================
-       BUCLE PRINCIPAL
-       ============================================================ */
+  // Bucle principal
   update(time) {
     if (!this.camera) return;
 
@@ -1473,8 +1450,6 @@ export class AngerRoom {
         this.wallSwapped = true;
         this.audio?.angerUnderwater();
         this.lockMovement = false;
-        // El fondo pasa a ser una pared más: mismo color y material que las otras,
-        // con un rastro tenue (tono sobre tono) de las frases
         this.backWallMat.map = this.backWallTexGhost;
         this.backWallMat.emissiveMap = null;
         this.backWallMat.emissiveIntensity = 0;
@@ -1552,14 +1527,12 @@ export class AngerRoom {
       (this.warmTarget - this.warmSmooth) * (1 - Math.exp(-dt * 4));
     const tension = THREE.MathUtils.clamp((this.playerDepth - 3) / 22, 0, 1);
 
-    // La luz acompaña al usuario, un poco hacia donde mira
     this.lantern.position.set(
       this.camLocal.x + this.camDir.x * 0.35,
       this.camLocal.y + 0.25,
       this.camLocal.z + this.camDir.z * 0.35,
     );
     const omega = 5 + 4 * tension;
-    // El latido de la luz se apaga cuando la ira se disipa
     const pulse =
       0.18 *
       Math.pow(Math.max(0, Math.sin(time * omega)), 6) *
@@ -1569,7 +1542,6 @@ export class AngerRoom {
       CFG.lantern.intensity * (1 - R.lanternDrop * rel) * (1 + pulse);
     this.lantern.color.copy(this.redCol).lerp(this.warmCol, this.warmSmooth);
 
-    // ALIVIO: la sala deja de ser roja y oscura (luz ambiente cálida, paredes, niebla)
     this.ambient.intensity = CFG.ambient * (1 - 0.4 * rel) + rel * R.ambient;
     this.ambient.color
       .copy(this.baseAmbientCol)
@@ -1593,11 +1565,9 @@ export class AngerRoom {
     this.shakeSpike *= Math.exp(-dt * 5);
     const stretch = THREE.MathUtils.clamp(this.wallSpeed / 8, 0, 1);
 
-    // EL ALIVIO (FOVs y temblores): cuando releaseSmooth llega a 1, la tensión baja a 0
     const activeTension = 1 - this.releaseSmooth;
     const k = this.intensity * activeTension;
 
-    // FOV vuelve fluidamente al 75 natural
     const targetFov = THREE.MathUtils.lerp(
       CFG.baseFov +
         CFG.fovStretch * stretch * this.intensity * activeTension -
@@ -1612,7 +1582,6 @@ export class AngerRoom {
       this.camera.updateProjectionMatrix();
     }
 
-    // Temblor se desvanece por completo
     const amp =
       (CFG.baseShake +
         CFG.shakeBoost * tension +

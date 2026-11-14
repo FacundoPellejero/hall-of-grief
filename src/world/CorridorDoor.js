@@ -369,7 +369,6 @@ export class CorridorDoor {
       group.add(hinge);
     });
 
-    // PLANO NEGRO (Sticker para tapar la pared)
     const voidPlaneGeo = new THREE.PlaneGeometry(
       openingW - 0.02,
       openingH - 0.02,
@@ -391,7 +390,6 @@ export class CorridorDoor {
     });
     const voidBox = new THREE.Mesh(voidBoxGeo, voidBoxMat);
 
-    // Z = -0.005 sitúa el plano en el punto exacto entre la pared (-0.01) y la cara interior de la puerta (-0.025)
     voidPlane.position.set(0, openingH / 2, -0.005);
     voidBox.position.set(0, openingH / 2, -1.75);
     group.add(frameLeft, frameRight, frameTop, doorPivot, voidBox, voidPlane);

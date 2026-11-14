@@ -4,10 +4,10 @@
 const DEBUG_ONLY_ROOMS = null;
 // Objeto que cada sala deja en el memorial de la sala de Aceptación
 const MEMORY_ITEMS = {
-  Denial: "vase", // el florero con flores
-  Anger: "photo", // el portarretratos cálido
-  Bargaining: "key", // la llave
-  Depression: "lantern", // el farol chico
+  Denial: "vase",
+  Anger: "photo",
+  Bargaining: "key",
+  Depression: "lantern",
 };
 
 export class GameManager {
@@ -20,7 +20,7 @@ export class GameManager {
     this.completedRooms = 0;
     this.memories = []; // objetos del recorrido, en el orden en que se completaron las salas
 
-    // Largo total del viaje, contando la Aceptación:
+    // Largo total del viaje
     // 4 salas -> 3 etapas y la Aceptación (una etapa queda sin visitar)
     // 5 salas -> las 4 etapas y la Aceptación
     this.targetRoomCount = Math.random() < 0.5 ? 4 : 5;
@@ -36,8 +36,6 @@ export class GameManager {
   }
 
   getNextRoom() {
-    // Siempre se recorren al menos 3 salas. Después llega la Aceptación, como 4ta o 5ta
-    // sala, y es el final del recorrido (no se vuelve a otra etapa).
     if (
       this.completedRooms >= this.targetRoomCount - 1 ||
       this.availableRooms.length === 0
@@ -56,8 +54,7 @@ export class GameManager {
     return this.completedRooms >= this.targetRoomCount - 1;
   }
 
-  // Calcula cómo se debe ver el pasillo (0 a 3) dependiendo de cuántas salas completamos
-  // y si la partida es de 4 o 5 salas.
+  // Calcula cómo se debe ver el pasillo
   getCorridorState() {
     if (this.targetRoomCount === 4) {
       // Progresión lineal: 0 -> 1 -> 2 -> 3

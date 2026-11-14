@@ -73,7 +73,7 @@ export class BargainingRoom {
     return this.currentW / 2 - 0.4;
   }
 
-  /* ---------- TEXTURAS AMBAR/SEPIA ---------- */
+  // Texturas
   createWallTexture() {
     const w = 512,
       h = 512;
@@ -159,7 +159,6 @@ export class BargainingRoom {
     return t;
   }
 
-  /* ---------- CONSTRUCCIÓN DEL ESPACIO ---------- */
   buildRoom() {
     const doorGroup = this.doorFactory.getClone(true, this.initialState);
     doorGroup.position.set(0, 0, this.doorZ);
@@ -297,7 +296,7 @@ export class BargainingRoom {
     }
   }
 
-  /* ---------- MUEBLES Y OBJETOS ---------- */
+  // Objetos
   buildFurnitureAndObjects() {
     const woodMat = new THREE.MeshStandardMaterial({
       map: this.createWoodTexture([85, 55, 35]),
@@ -318,7 +317,7 @@ export class BargainingRoom {
     );
     top.position.y = 0.9;
 
-    top.userData = { id: "bargain_table", prompt: "" }; // Sin pistas explicitas
+    top.userData = { id: "bargain_table", prompt: "" };
     this.interactables.push(top);
 
     const legGeo = new THREE.CylinderGeometry(0.04, 0.02, 0.9);
@@ -404,7 +403,7 @@ export class BargainingRoom {
     );
     keyTeeth.position.set(0.02, -0.05, 0);
     keyGroup.add(keyBase, keyHead, keyTeeth);
-    keyGroup.rotation.set(-Math.PI / 2, Math.PI / 4, 0); // Acostada (-90° en X) y cruzada (45° en Y)
+    keyGroup.rotation.set(-Math.PI / 2, Math.PI / 4, 0);
     createObj(keyGroup, "Llave", 1.2, 1.05, this.doorZ - 4.5);
 
     const shelf1 = new THREE.Mesh(
@@ -444,7 +443,7 @@ export class BargainingRoom {
     this.roomGroup.add(clockData.group);
   }
 
-  /* ---------- PAPELES FLOTANTES (Múltiples InstancedMesh por rendimiento) ---------- */
+  // Papeles flotantes
   buildFloatingPapers() {
     const phrases = [
       "¿Y si hubiera estado ahí?",
@@ -463,7 +462,7 @@ export class BargainingRoom {
 
     const geo = new THREE.BoxGeometry(0.2, 0.28, 0.002);
 
-    // 1. Creamos UN SOLO material en blanco (con renglones pero sin texto) para reciclarlo
+    // Material blanco
     const blankTex = this.createPaperTexture("");
     const blankMat = new THREE.MeshStandardMaterial({
       map: blankTex,
@@ -477,8 +476,6 @@ export class BargainingRoom {
         roughness: 0.9,
       });
 
-      // 2. Un cubo en Three.js tiene 6 caras en este orden exacto:
-      // [Derecha, Izquierda, Arriba, Abajo, Frente, Dorso]
       const materials = [
         blankMat, // 0: Derecha
         blankMat, // 1: Izquierda
@@ -516,12 +513,12 @@ export class BargainingRoom {
     });
   }
 
-  /* ---------- LÓGICA DE INTERACCIÓN ---------- */
+  // Interacción
   interact(object, uiPromptCallback) {
     const id = object.userData.id;
 
     const tempMsg = (msg) => {
-      if (!msg) return; // Si no hay mensaje, solo hace la acción en silencio
+      if (!msg) return;
       const old = object.userData.prompt;
       object.userData.prompt = msg;
       uiPromptCallback(msg);
@@ -585,13 +582,9 @@ export class BargainingRoom {
         this.roomGroup.add(this.heldObject);
         const slotX = -0.45 + this.objectsPlaced * 0.3;
 
-        // Ajustamos un poco la altura (Y=0.935) para que no floten ni se hundan
         this.heldObject.position.set(slotX, 0.935, this.doorZ - 6.0);
-
-        // Rescata la rotación original de cada objeto
         this.heldObject.rotation.copy(this.heldObject.userData.originalRot);
 
-        // Aplana la carta para que quede bien sobre la mesa
         if (this.heldObject.userData.prompt === "Carta") {
           this.heldObject.rotation.x = -Math.PI / 2;
         }
@@ -632,7 +625,6 @@ export class BargainingRoom {
             child.material.emissiveIntensity = 0.1;
         });
       });
-      // La mesa empieza a brillar en el update() con un pulso
 
       const mesa = this.interactables.find(
         (i) => i.userData.id === "bargain_table",
@@ -668,7 +660,7 @@ export class BargainingRoom {
     }, 1500);
   }
 
-  /* ---------- BUCLE PRINCIPAL ---------- */
+  // Bucle principal
   update(time) {
     if (!this.lastTime) this.lastTime = time;
     const dt = Math.min(0.05, time - this.lastTime);
@@ -743,7 +735,7 @@ export class BargainingRoom {
     }
   }
 
-  /* ---------- CÓDIGO DEL RELOJ ---------- */
+  // Reloj
   createClockFaceTexture() {
     const S = 512,
       c0 = S / 2;

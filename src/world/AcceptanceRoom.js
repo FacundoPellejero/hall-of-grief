@@ -1,8 +1,6 @@
 import * as THREE from "three";
 
-/* ============================================================
-   CONFIG: tocá estos valores para ajustar rápido
-   ============================================================ */
+//Variables de configuración
 const CFG = {
   doorZ: -8, // puerta de entrada
   wallZ: -30, // pared del fondo (puerta de salida)
@@ -227,9 +225,7 @@ export class AcceptanceRoom {
     });
   }
 
-  /* ============================================================
-     CONSTRUCCIÓN
-     ============================================================ */
+  // construcción de la habitación
   buildRoom() {
     this.setupAtmosphere();
     this.buildLights();
@@ -309,7 +305,7 @@ export class AcceptanceRoom {
     this.roomGroup.add(dome, this.sunGlow);
   }
 
-  /* ---------- Paredes, techo con claraboya y piso ---------- */
+  // Paredes, techo y piso
   buildArchitecture() {
     const { halfW: W, H, wallZ, doorZ } = CFG;
     const L = doorZ - wallZ; // 22
@@ -373,7 +369,6 @@ export class AcceptanceRoom {
     floor.position.set(0, 0.005, midZ);
     this.roomGroup.add(floor);
 
-    // Haces de sol que bajan por la claraboya (planos aditivos con degradé)
     const bc = canvasOf(64, 256);
     const b = bc.getContext("2d");
     const bg = b.createLinearGradient(0, 0, 0, 256);
@@ -418,7 +413,7 @@ export class AcceptanceRoom {
     });
   }
 
-  /* ---------- Jardín: canteros, pasto que se mece, flores y árboles ---------- */
+  // Jardín: canteros, pasto, flores y árboles
   buildGarden() {
     const soilMat = this.std(0x4a3626, { roughness: 1 });
     const beds = [
@@ -445,7 +440,7 @@ export class AcceptanceRoom {
     plaza.position.set(CFG.pot.x, 0.02, CFG.pot.z);
     this.roomGroup.add(plaza);
 
-    // Pasto instanciado: el vaivén ocurre en el vertex shader (sin costo de CPU)
+    // Pasto instanciado
     const blade = new THREE.BufferGeometry();
     blade.setAttribute(
       "position",
@@ -564,7 +559,7 @@ export class AcceptanceRoom {
     });
   }
 
-  /* ---------- Afuera: pradera, camino y colinas hacia el horizonte ---------- */
+  // Exterior
   buildExterior() {
     const S = 256;
     const cv = canvasOf(S, S);
@@ -637,7 +632,7 @@ export class AcceptanceRoom {
     });
     this.stripVoid(entry);
 
-    // Salida: de frente al usuario. El id NO empieza con "entryDoor": la abre la propia sala.
+    // Salida
     const exit = this.doorFactory.getClone(true, this.initialState);
     exit.position.set(0, 0, CFG.wallZ);
     exit.rotation.y = 0;
@@ -653,7 +648,6 @@ export class AcceptanceRoom {
     this.exitDoorGroup = exit;
     this.roomGroup.add(entry, exit);
 
-    // Luz que se cuela por los bordes de la puerta cuando se destraba
     this.edgeMat = new THREE.MeshBasicMaterial({
       color: 0xffe2a0,
       transparent: true,
@@ -673,9 +667,7 @@ export class AcceptanceRoom {
     });
   }
 
-  /* ---------- Memorial: un altar con plataforma, objetos que toman forma y velas a los costados ---------- */
-  // Huecos del frente de la mesa, relativos a su centro: [hacia la sala, a lo ancho].
-  // La plataforma de atrás recibe el primer objeto que el usuario elija; el resto se agrupa adelante.
+  // Memorial
   frontSlots(count) {
     const layouts = [
       [],
@@ -767,7 +759,7 @@ export class AcceptanceRoom {
     riser.position.set(tx - 0.25, this.memorialY + 0.1, tz);
     this.roomGroup.add(riser);
 
-    // Huecos: un anillo tenue marca dónde dejar cada objeto. Los del frente giran apenas hacia el centro.
+    // Huecos
     const rc = canvasOf(128, 128);
     const r = rc.getContext("2d");
     r.strokeStyle = "rgba(217,180,91,0.9)";
@@ -820,7 +812,7 @@ export class AcceptanceRoom {
       this.slots.push(slot);
     });
 
-    // Velas a los costados: se van encendiendo a medida que el memorial toma forma
+    // Velas
     const brass = this.std(0xc9a24a, { metalness: 0.6, roughness: 0.35 });
     const wax = this.std(0xf3ead2, { roughness: 0.6 });
     this.candles = [];
@@ -934,7 +926,7 @@ export class AcceptanceRoom {
     this.cardTex.needsUpdate = true;
   }
 
-  /* ---------- Reloj (mismo de las otras salas, con la dalia de vuelta en el vidrio) ---------- */
+  // Reloj
   buildClock(R) {
     const group = new THREE.Group();
     const add = (m) => {
@@ -1019,7 +1011,6 @@ export class AcceptanceRoom {
       secondHand: makeHand(R * 0.9, 0.012, R * 0.18, coral, 0.004, 0.154),
     };
 
-    // Vidrio con la dalia (la del reloj de la Negación)
     const gc = canvasOf(S, S);
     const gx = gc.getContext("2d");
     gx.beginPath();
@@ -1055,7 +1046,6 @@ export class AcceptanceRoom {
     return { group, hands };
   }
 
-  // 3:17:41 detenido; al empezar a crecer la planta, el tiempo vuelve a correr desde ese mismo instante
   updateClock(time) {
     const base = 3 * 3600 + 17 * 60 + 41;
     let total = base;
@@ -1076,7 +1066,7 @@ export class AcceptanceRoom {
     secondHand.rotation.z = -((total % 60) / 60) * TAU;
   }
 
-  /* ---------- Objetos del recorrido, esparcidos por el jardín ---------- */
+  // Objetos del recorrido esparcidos por el jardín
   itemModel(id) {
     const g = new THREE.Group();
     const m = (mesh, x, y, z) => {
@@ -1085,7 +1075,6 @@ export class AcceptanceRoom {
       return mesh;
     };
     if (id === "vase") {
-      // El florero con flores de la Negación
       const vase = new THREE.Mesh(
         new THREE.LatheGeometry(
           profile([
@@ -1135,7 +1124,6 @@ export class AcceptanceRoom {
         );
       });
     } else if (id === "photo") {
-      // El portarretratos cálido de la Ira (las dos siluetas)
       const wood = this.std(0x7a4a24);
       const frame = m(
         new THREE.Mesh(new THREE.BoxGeometry(0.26, 0.34, 0.03), wood),
@@ -1177,7 +1165,6 @@ export class AcceptanceRoom {
         -0.06,
       ).rotation.x = 0.5;
     } else if (id === "key") {
-      // La llave de la Negociación: apoyada de costado, en diagonal
       const brass = this.std(0xc9a24a, { metalness: 0.6, roughness: 0.35 });
       const pivot = new THREE.Group();
       pivot.position.y = 0.02;
@@ -1211,7 +1198,6 @@ export class AcceptanceRoom {
       );
       g.add(pivot);
     } else {
-      // Un farol chico: la luz de la Depresión
       const metal = this.std(0x27324a, { metalness: 0.2, roughness: 0.55 });
       m(
         new THREE.Mesh(
@@ -1290,7 +1276,7 @@ export class AcceptanceRoom {
     });
   }
 
-  /* ---------- Maceta, semilla, jarra y planta ---------- */
+  // Maceta, semilla, jarra y planta
   buildPotAndPlant() {
     const { x: px, z: pz } = CFG.pot;
     const stone = this.std(0xb9b09a, { roughness: 0.9 });
@@ -1334,7 +1320,7 @@ export class AcceptanceRoom {
     this.addHit(potHit);
     this.colliders.push({ x: px, z: pz, r: 0.55 });
 
-    // Semilla (aparece en el plato del memorial cuando está completo)
+    // Semilla
     const seed = new THREE.Group();
     const body = new THREE.Mesh(
       new THREE.SphereGeometry(0.035, 10, 8),
@@ -1357,7 +1343,7 @@ export class AcceptanceRoom {
     seed.add(this.seed.hit);
     this.roomGroup.add(seed);
 
-    // Jarra de barro sobre un banquito, junto a la maceta
+    // Jarra
     const jug = new THREE.Group();
     const clay = this.std(0xb4673f, { roughness: 0.8, side: THREE.DoubleSide });
     jug.add(
@@ -1477,7 +1463,7 @@ export class AcceptanceRoom {
     this.stemMaxH = 0.85;
   }
 
-  /* ---------- Polvo dorado en los haces y luciérnagas alrededor de la planta ---------- */
+  // Polvo dorado y luciérnagas alrededor de la planta
   makeMotes(count, box, size, center) {
     const pos = new Float32Array(count * 3),
       seed = new Float32Array(count);
@@ -1546,7 +1532,7 @@ export class AcceptanceRoom {
     );
     this.fireflyMat.uniforms.uAlpha.value = 0;
 
-    // Chorro de agua de la jarra
+    // Chorro de agua
     const n = 40;
     const geo = new THREE.BufferGeometry();
     geo.setAttribute(
@@ -1570,9 +1556,6 @@ export class AcceptanceRoom {
     this.roomGroup.add(this.stream);
   }
 
-  /* ============================================================
-     INTERACCIÓN (un solo clic: el objeto define qué pasa)
-     ============================================================ */
   tween(dur, fn, done) {
     this.tweens.push({ t: 0, dur, fn, done });
   }
@@ -1592,7 +1575,7 @@ export class AcceptanceRoom {
     return p < 0.5 ? 2 * p * p : 1 - Math.pow(-2 * p + 2, 2) / 2;
   }
 
-  // Pasa un objeto de la mano al jardín (conserva su posición en el mundo)
+  // Pasa un objeto de la mano al jardín
   releaseToRoom(group) {
     const v = new THREE.Vector3();
     group.getWorldPosition(v);
@@ -1653,7 +1636,7 @@ export class AcceptanceRoom {
   useSlot(slot) {
     if (!this.carrying || this.carrying.type !== "item" || slot.filled) {
       this.audio?.playSoft?.(330);
-      this.hint = 1; // el jardín responde: los objetos que faltan brillan un poco más
+      this.hint = 1;
       return;
     }
     const item = this.carrying.item;
@@ -1673,7 +1656,7 @@ export class AcceptanceRoom {
         slot.ring.material.opacity = 0.9;
       },
       slot.yaw,
-    ); // queda de frente a la sala
+    );
     this.audio?.playSoft?.(659);
     this.audio?.addHarmonyVoice?.(CFG.chord[this.placed % CFG.chord.length]);
     this.placed++;
@@ -1683,7 +1666,7 @@ export class AcceptanceRoom {
         1.4,
         () => {},
         () => this.revealSeed(),
-      ); // pausa corta, en tiempo de juego
+      );
   }
 
   revealSeed() {
@@ -1711,7 +1694,7 @@ export class AcceptanceRoom {
     }
     this.carrying = { type: "jug" };
     this.removeHit(this.jug.hit);
-    this.takeInHand(this.jug.group, 0.8, -0.6); // el pico apunta hacia adelante y a la izquierda
+    this.takeInHand(this.jug.group, 0.8, -0.6);
     this.audio?.playSoft?.(440);
   }
 
@@ -1801,7 +1784,7 @@ export class AcceptanceRoom {
   useExitDoor() {
     if (!this.exitUnlocked) {
       this.audio?.playSoft?.(330);
-      this.hint = 1; // sin error ni cartel: la planta se hace un poco más notoria
+      this.hint = 1;
       return;
     }
     if (this.exitOpen || this.exitOpening) return;
@@ -1819,7 +1802,7 @@ export class AcceptanceRoom {
     );
   }
 
-  /* ---------- Tarjeta en blanco: escribir es opcional y no se guarda en ningún lado ---------- */
+  // Tarjeta en blanco: escribir es opcional y no se guarda en ningún lado
   openCardEditor() {
     if (this.editorOpen) return;
     this.editorOpen = true;
@@ -1866,7 +1849,7 @@ export class AcceptanceRoom {
         this.cardTouched = true;
         this.audio?.addHarmonyVoice?.(783.99);
       }
-      this.cardMat.emissiveIntensity = 0.05; // un brillo muy suave: que se lea lo escrito
+      this.cardMat.emissiveIntensity = 0.05;
       this.cardGlow.material.opacity = 0.3;
       this.audio?.playSoft?.(698);
       setTimeout(() => this.extras.setControlsLocked?.(true), 0);
@@ -1887,9 +1870,7 @@ export class AcceptanceRoom {
     ta.addEventListener("keyup", (e) => e.stopPropagation());
   }
 
-  /* ============================================================
-     BUCLE PRINCIPAL
-     ============================================================ */
+  // BUCLE PRINCIPAL
   collide(yaw) {
     const ox = this.roomGroup.position.x;
     for (const c of this.colliders) {
@@ -1911,7 +1892,7 @@ export class AcceptanceRoom {
     const g = P.g;
 
     if (g >= CFG.sproutAt && !this.exitUnlocked) {
-      this.exitUnlocked = true; // primer brote: la puerta se destraba (sin cartel, solo luz)
+      this.exitUnlocked = true; // primer brote: la puerta se destraba
       this.audio?.playBell?.(1046);
     }
     this.edgeMat.opacity +=
@@ -1922,7 +1903,7 @@ export class AcceptanceRoom {
     const h = this.stemMaxH * smooth(0.02, 0.85, g);
     this.stem.scale.y = Math.max(0.001, h);
     this.plant.rotation.z = Math.sin(time * 0.8) * 0.03 * h;
-    // Hojas: aparecen y se abren de a una
+    // Hojas
     this.leaves.forEach((L) => {
       const s = smooth(L.appear, L.appear + 0.12, g) * L.size;
       L.pivot.scale.setScalar(Math.max(0.001, s));

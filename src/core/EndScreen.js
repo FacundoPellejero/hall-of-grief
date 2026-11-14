@@ -1,12 +1,6 @@
-/* Pantalla final: se funde a un blanco cálido y muestra el agradecimiento.
-   Para sumar frases finales, agregarlas al array END_LINES: cada final muestra una distinta. */
-export const END_LINES = [
-  "Lo que fue, sigue creciendo.",
-  // "Se puede extrañar y seguir.",
-  // "No se va. Cambia de lugar.",
-];
+// Pantalla final: se funde a un blanco cálido y muestra el agradecimiento.
+export const END_LINES = ["Lo que fue, sigue creciendo."];
 
-// Para el final, revisar
 export const END_CONFIG = {
   resources: [], // por ejemplo: [{ label: "Línea de apoyo ...", detail: "número o enlace" }]
   feedbackUrl: "", // enlace a un formulario con las preguntas abiertas del plan de pruebas
@@ -20,7 +14,7 @@ export function showEndScreen({
   document.getElementById("crosshair")?.style.setProperty("display", "none");
   document.getElementById("ui-prompt")?.style.setProperty("display", "none");
 
-  // 1) Fundido a blanco cálido (viene de la sala más luminosa, no de un negro)
+  // Fundido a blanco
   const fade = document.createElement("div");
   fade.style.cssText =
     "position:fixed;inset:0;background:#fbf3dc;opacity:0;transition:opacity 3s ease-in-out;z-index:200;pointer-events:none;";
@@ -29,7 +23,7 @@ export function showEndScreen({
     requestAnimationFrame(() => (fade.style.opacity = "1")),
   );
 
-  // 2) Pantalla de agradecimiento
+  // Pantalla de agradecimiento
   setTimeout(() => {
     const screen = document.createElement("div");
     screen.style.cssText =

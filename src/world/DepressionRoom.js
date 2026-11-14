@@ -1,8 +1,6 @@
 import * as THREE from "three";
 
-/* ============================================================
-   CONFIG: valores para ajustar
-   ============================================================ */
+//Variables de configuración
 const CFG = {
   doorZ: -8,
   exitZ: -108,
@@ -166,9 +164,7 @@ export class DepressionRoom {
     return t;
   }
 
-  /* ============================================================
-     CONSTRUCCIÓN
-     ============================================================ */
+  // Construcción de la habitación
   buildRoom() {
     this.setupAtmosphere();
     this.buildLights();
@@ -211,9 +207,7 @@ export class DepressionRoom {
     );
     this.roomGroup.add(this.ambient, this.playerLight);
 
-    // Pool de SpotLights de cantidad fija: solo iluminan los faroles cercanos.
-    // Los demás faroles se ven con sus haces falsos (baratos). Cambiar la cantidad
-    // de luces en runtime obliga a recompilar shaders, por eso el pool es fijo.
+    // Pool de SpotLights
     const S = CFG.spot;
     this.spots = [];
     for (let j = 0; j < S.pool; j++) {
@@ -231,7 +225,7 @@ export class DepressionRoom {
     }
   }
 
-  /* ---------- Barro ---------- */
+  // Suelo
   paintMud() {
     const S = 512;
     const cv = canvasOf(S, S);
@@ -273,7 +267,7 @@ export class DepressionRoom {
     this.roomGroup.add(floor);
   }
 
-  /* ---------- Faroles (instanciados: pocas draw calls) ---------- */
+  // Faroles
   instanced(geo, mat, matrices) {
     const m = new THREE.InstancedMesh(geo, mat, matrices.length);
     matrices.forEach((mx, i) => m.setMatrixAt(i, mx));
@@ -352,7 +346,7 @@ export class DepressionRoom {
       metal,
       at(H + 0.02),
     );
-    // Vidrio encendido (sin niebla: los faroles lejanos funcionan como faros)
+
     const glassMat = new THREE.MeshBasicMaterial({
       color: 0xffd9a0,
       fog: false,
@@ -384,7 +378,6 @@ export class DepressionRoom {
     glow.frustumCulled = false;
     this.roomGroup.add(glow);
 
-    // Haz de luz falso (cono aditivo con borde suave) + charco de luz en el piso
     const beamH = H - 0.4;
     const tanA = Math.tan(CFG.spot.angle);
     const beamR = beamH * tanA;
@@ -447,7 +440,7 @@ export class DepressionRoom {
     this.beamTan = tanA;
   }
 
-  /* ---------- Mesas y sillas hundidas en el barro (instanciadas) ---------- */
+  // Objetos enterrados
   buildProps() {
     const wood = new THREE.MeshStandardMaterial({
       color: 0x17140f,
@@ -524,7 +517,7 @@ export class DepressionRoom {
     });
   }
 
-  /* ---------- Lluvia: líneas largas animadas 100% en el vertex shader ---------- */
+  // Lluvia
   buildRain() {
     const N = CFG.rainCount;
     const pos = new Float32Array(N * 6);
@@ -598,7 +591,7 @@ export class DepressionRoom {
     this.roomGroup.add(rain);
   }
 
-  /* ---------- Siluetas 2D con glitch ---------- */
+  // Siluetas
   paintFigure(v) {
     const W = 256,
       H = 512;
@@ -653,7 +646,7 @@ export class DepressionRoom {
       if (v === 0) {
         standing();
       } else if (v === 1) {
-        // sentada, encorvada, en una silla
+        // sentada en una silla
         c.beginPath();
         c.ellipse(118, 190, 24, 28, 0.3, 0, Math.PI * 2);
         c.fill();
@@ -807,10 +800,7 @@ export class DepressionRoom {
     }
   }
 
-  /* ---------- Puertas de entrada y de salida ---------- */
-  // El modelo de la puerta trae un plano y un box negros detrás (el efecto de "entrar a un
-  // lugar oscuro" del pasillo). Acá no hacen falta: se quitan solo de estos dos clones,
-  // el modelo original de CorridorDoor no se toca.
+  // Puertas de entrada y salida
   stripVoid(group) {
     [...group.children].forEach((c) => {
       if (
@@ -856,7 +846,7 @@ export class DepressionRoom {
     this.roomGroup.add(entry, exit);
   }
 
-  /* ---------- Reloj imponente (mismo reloj, materiales sin luz y sin niebla) ---------- */
+  // Reloj
   paintClockFace() {
     const S = 1024,
       c0 = S / 2;
@@ -950,13 +940,13 @@ export class DepressionRoom {
     group.scale.setScalar(CFG.clockScale);
     const cz = this.exitZ - CFG.clockBehind;
     group.position.set(0, CFG.clockY, cz);
-    // Renderizado forzado: sin niebla, sin culling, y dibujado aunque quede lejos del frustum
+
     group.traverse((o) => {
       o.frustumCulled = false;
     });
     this.clockGroup = group;
 
-    // Resplandor frío detrás del reloj (la luna que no es luna)
+    // Resplandor frío detrás del reloj
     const rW = R * CFG.clockScale;
     const halo = new THREE.Mesh(
       new THREE.PlaneGeometry(rW * 5, rW * 5),
@@ -979,8 +969,6 @@ export class DepressionRoom {
     this.updateClock(0);
   }
 
-  // Tic lento y pesado: salto brusco con un pequeño rebote cada `clockTick` segundos.
-  // Parte de las 3:17:41, la hora en la que quedaron detenidos los otros relojes.
   updateClock(t) {
     const T = CFG.clockTick;
     const n = Math.floor(t / T);
@@ -999,9 +987,7 @@ export class DepressionRoom {
     }
   }
 
-  /* ============================================================
-     MECÁNICAS
-     ============================================================ */
+  // Mecanicas
   // 1 = bajo la luz de un farol, 0 = oscuridad total
   lightAt(px, pz) {
     let light = 0;
@@ -1014,8 +1000,7 @@ export class DepressionRoom {
     return light;
   }
 
-  // Freno falso: main.js ya movió al usuario este frame; acá recortamos ese
-  // desplazamiento según cuánta luz hay (contrarresta el movimiento).
+  // Freno falso
   updateMovement(dt) {
     if (!this.yaw) this.yaw = this.camera.parent && this.camera.parent.parent;
     const yaw = this.yaw;
@@ -1041,7 +1026,7 @@ export class DepressionRoom {
     );
     this.prev.copy(yaw.position);
 
-    // Peso en el cuerpo: pasos más hondos, cabeza gacha y FOV un poco más cerrado
+    // Peso en el cuerpo
     const heavy = 1 - this.brake;
     this.stepPhase += real * 7;
     const amp = THREE.MathUtils.lerp(0.012, 0.045, heavy);
@@ -1067,8 +1052,8 @@ export class DepressionRoom {
       n - 1,
     );
 
-    // Ventana de faroles con luz real: uno atrás y los 3 de adelante. El farol m
-    // siempre lo maneja el spot (m % P), así solo uno cambia de farol por paso.
+    // Ventana de faroles con luz real
+    // uno atrás y los 3 de adelante. El farol m siempre lo maneja el spot (m % P), así solo uno cambia de farol por paso.
     const desired = new Array(P).fill(-1);
     for (let m = k - 1; m <= k + P - 2; m++)
       if (m >= 0 && m < n) desired[m % P] = m;
@@ -1120,7 +1105,7 @@ export class DepressionRoom {
       const m = s.mesh;
       const d = Math.hypot(m.position.x - px, m.position.z - pz);
       const env = smooth(0, 1.2, age) * (1 - smooth(s.life - 1.6, s.life, age));
-      // Se desvanece con la distancia: opacidad 0 exacta a los 6.5 m (nunca se ven de cerca)
+      // Se desvanece con la distancia
       const near = smooth(S.fadeEnd, S.fadeStart, d);
       const prox = near * (1 - smooth(40, 60, d));
       const op = env * prox * kill * 0.9;
@@ -1158,7 +1143,6 @@ export class DepressionRoom {
         "Ya no hay vuelta atrás. No encontras el camino de regreso",
       );
     } else if (id === "entryDoor_depression") {
-      // main.js se encarga de la salida cuando isDoorUnlocked es true
       uiPromptCallback(
         this.isDoorUnlocked
           ? "La puerta cede."
@@ -1167,9 +1151,7 @@ export class DepressionRoom {
     }
   }
 
-  /* ============================================================
-     BUCLE PRINCIPAL
-     ============================================================ */
+  // Bucle principal
   update(time) {
     if (this.lastTime === null) {
       this.lastTime = time;
@@ -1194,7 +1176,7 @@ export class DepressionRoom {
     if (this.resolved)
       this.relief += (1 - this.relief) * (1 - Math.exp(-dt * 0.6));
 
-    // Luz del usuario: sutil, un poco adelante y a la altura de la cintura (ve el piso inmediato)
+    // Luz del usuario
     this.camera.getWorldDirection(this.camDir);
     this.camDir.y = 0;
     if (this.camDir.lengthSq() > 0) this.camDir.normalize();
@@ -1214,7 +1196,6 @@ export class DepressionRoom {
     ru.uAlpha.value = 0.2 - 0.07 * this.relief;
 
     this.updateSilhouettes(time, px, pz);
-    // El reloj no se encoge ni se mueve al resolver: sigue marcando su tic pesado
     this.updateClock(time - this.t0);
   }
 }
