@@ -1343,7 +1343,7 @@ export class Corridor {
     this.flickerLights.forEach((item, index) => {
       const noise = Math.sin(time * 10 + index * 2) * 0.04;
       const isFlickerFrame = !this.menuMode && Math.random() < 0.02;
-      if (isFlickerFrame && this.onFlicker) this.onFlicker();
+      // if (isFlickerFrame && this.onFlicker) this.onFlicker();
       let factor = 1.0 + noise;
       if (isFlickerFrame) factor *= 0.3;
 

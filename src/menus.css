@@ -7,8 +7,8 @@
   --hog-line: rgba(209, 213, 219, 0.16);
   --hog-text: #e5e7eb;
   --hog-muted: #a3a9b3;
-  --hog-accent: #e0a030;
-  --hog-focus: #f4d28a;
+  --hog-accent: #477A91;
+  --hog-focus: #A9CDD4;
   --hog-font:
     system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial,
     sans-serif;
@@ -185,11 +185,11 @@
 }
 :is(#overlay, #pause-menu) .hog-btn--primary {
   width: 100%;
-  background: rgba(224, 160, 48, 0.14);
+  background: #477A91;
   border-color: var(--hog-accent);
 }
 :is(#overlay, #pause-menu) .hog-btn--primary:hover {
-  background: rgba(224, 160, 48, 0.24);
+  background: #5e93ab;
 }
 :is(#overlay, #pause-menu) .hog-btn--quiet {
   width: 100%;
@@ -198,7 +198,7 @@
 }
 :is(#overlay, #pause-menu) .hog-toggle[aria-pressed="true"] {
   border-color: var(--hog-accent);
-  background: rgba(224, 160, 48, 0.12);
+  background: #376e87;;
 }
 :is(#overlay, #pause-menu) .hog-toggle__state {
   padding-left: 10px;

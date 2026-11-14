@@ -715,10 +715,9 @@ export class AudioManager {
       d.clockOk = true;
       d.ghostBus.gain.setTargetAtTime(0, now, 0.1);
     }
-    if (kind !== "drawer") {
-      d.resolved = Math.min(1, d.resolved + 0.5);
-      this._denialApply(d.resolved);
-    }
+   
+    d.resolved = Math.min(1, d.resolved + 1 / 3);
+    this._denialApply(d.resolved);
   }
 
   denialClockTick() {

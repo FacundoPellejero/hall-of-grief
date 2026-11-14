@@ -81,7 +81,6 @@ class App {
   buildWorld() {
     this.corridor = new Corridor(this.scene);
     this.corridor.setCorridorState(0, this.scene);
-    this.corridor.onFlicker = () => this.audioManager.corridorFlicker();
     this.initCorridorStateControls();
     this.setupMenuShot();
   }
