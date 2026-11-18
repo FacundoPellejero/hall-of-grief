@@ -3,6 +3,19 @@ import * as THREE from "three";
 const rnd = (a, b) => a + Math.random() * (b - a);
 
 const FRAME_TILT = 0.12;
+
+// Sentarse en el sillón
+const SIT = {
+  eyeY: 1.15, // altura de los ojos sentado
+  dx: 0.05, // corrimiento hacia el respaldo desde el centro del sillón
+  turn: 0.4, // radianes que gira la vista hacia la izquierda del frente del sillón 
+  pitch: -0.2, // mira hacia abajo
+  maxLookSide: 1.3, // radianes a cada lado del frente del sillón (1.2 ≈ 69°)
+  maxLookDown: 0.25, // radianes: sentado no se puede mirar más hacia abajo que esto
+  sitMs: 1200,
+  standMs: 650,
+};
+const COLLISION_RADIUS = 0.3; 
 const CLOCK_STOPPED = { h: 3, m: 17, s: 41 };
 const DRAWER_OUT = 0.07;
 
@@ -81,12 +94,33 @@ export class DenialRoom {
     this.interactables = [];
     this.textures = [];
     this.anomaliesAccepted = 0;
-    this.totalAnomalies = 2;
+    this.totalAnomalies = 3;
     this.isDoorUnlocked = false;
     this._disposed = false;
     this._unlockTimeout = null;
     this._clockRaf = null;
     this._drawerRaf = null;
+    this._frameRaf = null;
+    this.lockMovement = false;
+    this.seated = false;
+    this._seatRaf = null;
+    this._sitAt = 0;
+    this._ignoreInteractUntil = 0;
+    // Se levanta con una tecla de movimiento (W A S D) o con un clic
+    this._onSeatKey = (e) => {
+      if (e.repeat || performance.now() - this._sitAt < 350) return;
+      if (
+        e.code === "KeyW" ||
+        e.code === "KeyA" ||
+        e.code === "KeyS" ||
+        e.code === "KeyD"
+      ) {
+        this.standUp();
+      }
+    };
+    this._onSeatMouse = () => {
+      if (performance.now() - this._sitAt > 350) this.standUp();
+    };
 
     this.roomGroup = new THREE.Group();
     this.scene.add(this.roomGroup);
@@ -136,11 +170,18 @@ export class DenialRoom {
     }
     if (this._clockRaf !== null) cancelAnimationFrame(this._clockRaf);
     if (this._drawerRaf !== null) cancelAnimationFrame(this._drawerRaf);
+    if (this._frameRaf !== null) cancelAnimationFrame(this._frameRaf);
     this._clockRaf = null;
     this._drawerRaf = null;
+    this._frameRaf = null;
     if (this.scene.onBeforeRender === this._rendererHook) {
       this.scene.onBeforeRender = this._previousOnBeforeRender || null;
     }
+    if (this._seatRaf !== null) cancelAnimationFrame(this._seatRaf);
+    this._seatRaf = null;
+    document.removeEventListener("keydown", this._onSeatKey);
+    document.removeEventListener("mousedown", this._onSeatMouse);
+    this.lockMovement = false;
     this.textures.forEach((texture) => texture.dispose());
     this.textures.length = 0;
     this.audio?.stopDenial();
@@ -362,7 +403,7 @@ export class DenialRoom {
     this.drawer = dresser.userData.drawer;
     const drawerData = {
       id: "drawer",
-      prompt: "Cerrar el cajón entreabierto",
+      prompt: "Siempre estuvo abierto",
       accepted: false,
     };
     this.drawer.traverse((o) => {
@@ -375,6 +416,15 @@ export class DenialRoom {
     const sofa = this.createSofa();
     sofa.position.set(halfW - 0.415, 0, Z(sofaS));
     group.add(sofa);
+
+    this.sofa = sofa;
+    const sofaData = { id: "sofa", prompt: "Ignorar lo que pasa" };
+    sofa.traverse((o) => {
+      if (o.isMesh) {
+        o.userData = sofaData;
+        this.interactables.push(o);
+      }
+    });
 
     const vaseS = 2.42;
     const vasePos = new THREE.Vector3(halfW - 0.43, 0, Z(vaseS));
@@ -420,7 +470,7 @@ export class DenialRoom {
     this._flushBouquet();
     const flowerData = {
       id: "flowers",
-      prompt: "Mantén presionado para mover las flores",
+      prompt: "Aún no se marchitan",
       accepted: false,
     };
     bouquet.group.traverse((o) => {
@@ -458,7 +508,7 @@ export class DenialRoom {
     this.clockHands = clock.hands;
     const clockData = {
       id: "clock",
-      prompt: "Observar reloj detenido",
+      prompt: "El tiempo puede esperar",
       accepted: false,
     };
     clock.parts.forEach((p) => {
@@ -473,7 +523,7 @@ export class DenialRoom {
     this.frame.rotation.set(0, Math.PI / 2, FRAME_TILT);
     const frameData = {
       id: "frame",
-      prompt: "Inspeccionar cuadro torcido",
+      prompt: "No está tan torcido",
       accepted: false,
     };
     painting.parts.forEach((p) => {
@@ -529,6 +579,19 @@ export class DenialRoom {
     group.add(dresserGlow);
 
     this.roomGroup.add(group);
+
+    // Colisiones
+    this.roomGroup.updateMatrixWorld(true);
+    const off = this.roomGroup.position;
+    this._colliders = [this.sofa, dresser].map((obj) => {
+      const b = new THREE.Box3().setFromObject(obj);
+      return {
+        minX: b.min.x - off.x,
+        maxX: b.max.x - off.x,
+        minZ: b.min.z - off.z,
+        maxZ: b.max.z - off.z,
+      };
+    });
   }
 
   createClock(R) {
@@ -1280,7 +1343,6 @@ export class DenialRoom {
       cam.updateMatrixWorld();
       rc.setFromCamera(ndc, cam);
 
-      // TRADUCCIÓN: Pasamos el clic global a coordenadas locales de la habitación.
       target
         .copy(rc.ray.direction)
         .multiplyScalar(drag.dist)
@@ -1355,7 +1417,7 @@ export class DenialRoom {
           st.placed = true;
           const idx = this.interactables.indexOf(st.group);
           if (idx >= 0) this.interactables.splice(idx, 1);
-          say("Colocas las flores en el jarrón.");
+          // say("Colocas las flores en el jarrón.");
         });
       } else {
         this._tweenBouquet(st.lyingT, 0, 0.5);
@@ -1744,11 +1806,19 @@ export class DenialRoom {
   interact(object, uiPromptCallback) {
     uiPromptCallback = uiPromptCallback || this.say;
     this._ui = uiPromptCallback;
+
+    // Sentado el clic solo sirve para levantarse, no para interactuar
+    if (this.seated || performance.now() < this._ignoreInteractUntil) return;
+
+    if (object.userData.id === "sofa") {
+      if (!this.isDoorUnlocked) this.sit();
+      return;
+    }
     if (object.userData.id === "entryDoor") {
       if (!this.isDoorUnlocked) {
         uiPromptCallback("Esta bloqueada. Preferís creer que nada cambió.");
       } else {
-        uiPromptCallback("Dejar de mirar hacia otro lado (Interactuar)");
+        uiPromptCallback("La realidad sigue ahí (Interactuar)");
       }
     }
 
@@ -1768,6 +1838,7 @@ export class DenialRoom {
       this.audio?.denialFound("drawer");
       this.anomaliesAccepted++;
       this.closeDrawer();
+      this.checkProgress(uiPromptCallback);
 
       // uiPromptCallback("Empujas el cajón hasta dejarlo al ras.");
     }
@@ -1775,9 +1846,9 @@ export class DenialRoom {
     if (object.userData.id === "frame" && !object.userData.accepted) {
       object.userData.accepted = true;
       this.audio?.denialFound("frame");
-      this.frame.rotation.z = 0;
+      this.straightenFrame();
       this.anomaliesAccepted++;
-      uiPromptCallback("Aceptas la distorsión del entorno.");
+      // uiPromptCallback("Aceptas la distorsión del entorno.");
       this.checkProgress(uiPromptCallback);
     }
   }
@@ -1823,18 +1894,220 @@ export class DenialRoom {
     this._drawerRaf = requestAnimationFrame(step);
   }
 
-  checkProgress(uiPromptCallback) {
-    if (this.anomaliesAccepted >= this.totalAnomalies) {
-      this.isDoorUnlocked = true;
-      this.entryDoor.userData.prompt = "Salir de la Negación (Interactuar)";
+  // main.js llama a update() cada cuadro, después de mover al jugador
+  update() {
+    this._collide();
+    this._limitSeatedLook();
+  }
 
-      this._unlockTimeout = setTimeout(() => {
-        this._unlockTimeout = null;
-        if (this._disposed) return;
-        uiPromptCallback(
-          "La puerta de Negación se ha desbloqueado. Es hora de avanzar.",
-        );
-      }, 1500);
+  
+  _collide() {
+    if (this.seated || this._seatRaf !== null || !this._colliders) return; // sentándose/levantándose atraviesa el sillón
+    const yaw = this._yawObject();
+    if (!yaw) return;
+    const ox = this.roomGroup.position.x;
+    const oz = this.roomGroup.position.z;
+    const R = COLLISION_RADIUS;
+    let x = yaw.position.x - ox;
+    let z = yaw.position.z - oz;
+    for (const b of this._colliders) {
+      const cx = Math.max(b.minX, Math.min(x, b.maxX));
+      const cz = Math.max(b.minZ, Math.min(z, b.maxZ));
+      const dx = x - cx;
+      const dz = z - cz;
+      const d2 = dx * dx + dz * dz;
+      if (d2 >= R * R) continue;
+      if (d2 > 1e-10) {
+        const d = Math.sqrt(d2);
+        x = cx + (dx / d) * R;
+        z = cz + (dz / d) * R;
+      } else if (this._lastSafe) {
+        x = this._lastSafe.x;
+        z = this._lastSafe.z;
+      } else {
+        const l = x - b.minX;
+        const r = b.maxX - x;
+        const f = z - b.minZ;
+        const n = b.maxZ - z;
+        const mn = Math.min(l, r, f, n);
+        if (mn === l) x = b.minX - R;
+        else if (mn === r) x = b.maxX + R;
+        else if (mn === f) z = b.minZ - R;
+        else z = b.maxZ + R;
+      }
     }
+    this._lastSafe = { x, z };
+    yaw.position.x = x + ox;
+    yaw.position.z = z + oz;
+  }
+
+ 
+  _limitSeatedLook() {
+    if (!this.seated || this._seatRaf !== null) return;
+    const pitch = this._pitchObject();
+    if (pitch && pitch.rotation.x < -SIT.maxLookDown)
+      pitch.rotation.x = -SIT.maxLookDown;
+
+  
+    const yaw = this._yawObject();
+    if (!yaw) return;
+    const front = Math.PI / 2;
+    const d = Math.atan2(
+      Math.sin(yaw.rotation.y - front),
+      Math.cos(yaw.rotation.y - front),
+    );
+    if (Math.abs(d) > SIT.maxLookSide) {
+      yaw.rotation.y = front + Math.sign(d) * SIT.maxLookSide;
+    }
+  }
+
+  _yawObject() {
+    return this.camera?.parent?.parent || null; 
+  }
+
+  _pitchObject() {
+    return this.camera?.parent || null;
+  }
+
+  _poseTween(target, duration, easeOut = false, onDone) {
+    const yaw = this._yawObject();
+    const pitch = this._pitchObject();
+    if (!yaw || !pitch) {
+      if (onDone) onDone();
+      return;
+    }
+    if (this._seatRaf !== null) cancelAnimationFrame(this._seatRaf);
+    const from = {
+      x: yaw.position.x,
+      y: yaw.position.y,
+      z: yaw.position.z,
+      ry: yaw.rotation.y,
+      rx: pitch.rotation.x,
+    };
+    // giro por el camino más corto
+    const dry =
+      target.ry === undefined
+        ? 0
+        : Math.atan2(
+            Math.sin(target.ry - from.ry),
+            Math.cos(target.ry - from.ry),
+          );
+    const t0 = performance.now();
+    const step = (now) => {
+      if (this._disposed) return;
+      const k = Math.min(1, Math.max(0, (now - t0) / duration));
+      const e = easeOut
+        ? 1 - Math.pow(1 - k, 3)
+        : k < 0.5
+          ? 4 * k * k * k
+          : 1 - Math.pow(-2 * k + 2, 3) / 2;
+      yaw.position.set(
+        from.x + (target.x - from.x) * e,
+        from.y + (target.y - from.y) * e,
+        from.z + (target.z - from.z) * e,
+      );
+      if (target.ry !== undefined) yaw.rotation.y = from.ry + dry * e;
+      if (target.rx !== undefined)
+        pitch.rotation.x = from.rx + (target.rx - from.rx) * e;
+      if (k < 1) {
+        this._seatRaf = requestAnimationFrame(step);
+      } else {
+        this._seatRaf = null;
+        if (onDone) onDone();
+      }
+    };
+    this._seatRaf = requestAnimationFrame(step);
+  }
+
+  sit() {
+    const yaw = this._yawObject();
+    if (this.seated || !yaw || !this.sofa) return;
+    this._prevPose = {
+      x: yaw.position.x,
+      y: yaw.position.y,
+      z: yaw.position.z,
+    };
+    const sofaPos = new THREE.Vector3();
+    this.sofa.getWorldPosition(sofaPos);
+
+    this.seated = true;
+    this.lockMovement = true;
+    this._sitAt = performance.now();
+    document.addEventListener("keydown", this._onSeatKey);
+    document.addEventListener("mousedown", this._onSeatMouse);
+
+
+    this._poseTween(
+      {
+        x: sofaPos.x + SIT.dx,
+        y: SIT.eyeY,
+        z: sofaPos.z,
+        ry: Math.PI / 2 + SIT.turn,
+        rx: SIT.pitch,
+      },
+      SIT.sitMs,
+    );
+  }
+
+  standUp() {
+    if (!this.seated) return;
+    this.seated = false;
+    document.removeEventListener("keydown", this._onSeatKey);
+    document.removeEventListener("mousedown", this._onSeatMouse);
+    // el mismo clic que lo levanta no debe disparar una interacción
+    this._ignoreInteractUntil = performance.now() + 450;
+
+    const p = this._prevPose;
+    this._poseTween({ x: p.x, y: p.y, z: p.z }, SIT.standMs, true, () => {
+      this.lockMovement = false;
+    });
+    (this._ui || this.say)("Los detalles no quieren desaparecer.");
+  }
+
+  // El cuadro se endereza de a poco (antes saltaba de golpe a 0)
+  straightenFrame(duration = 900) {
+    const frame = this.frame;
+    const from = frame.rotation.z;
+    const t0 = performance.now();
+    const step = (now) => {
+      if (this._disposed) return;
+      const k = Math.min(1, Math.max(0, (now - t0) / duration));
+      const eased = 1 - Math.pow(1 - k, 3); 
+      frame.rotation.z = from * (1 - eased);
+      if (k < 1) {
+        this._frameRaf = requestAnimationFrame(step);
+      } else {
+        frame.rotation.z = 0;
+        this._frameRaf = null;
+      }
+    };
+    if (this._frameRaf !== null) cancelAnimationFrame(this._frameRaf);
+    this._frameRaf = requestAnimationFrame(step);
+  }
+
+  checkProgress(uiPromptCallback) {
+    if (this.isDoorUnlocked || this.anomaliesAccepted < this.totalAnomalies)
+      return;
+    this.isDoorUnlocked = true;
+
+   
+    this.interactables = this.interactables.filter(
+      (o) => o.userData.id !== "sofa",
+    );
+
+  
+    this.entryDoorGroup.traverse((c) => {
+      if (c.userData && c.userData.id === "entryDoor") {
+        c.userData.prompt = "La realidad sigue ahí (Interactuar)";
+      }
+    });
+
+    this._unlockTimeout = setTimeout(() => {
+      this._unlockTimeout = null;
+      if (this._disposed) return;
+      (uiPromptCallback || this.say)(
+        "Los detalles se acomodan. Ya no hace falta mirar hacia otro lado.",
+      );
+    }, 1500);
   }
 }
