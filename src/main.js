@@ -24,6 +24,8 @@ const MENU_SHOT = {
 const DOOR_LOOK_Y = 1.3;
 const DOOR_LOOK_MAX_DOWN = 0.32; // tope de inclinación hacia abajo, en radianes
 
+const END_UNLOCK_MS = 3000;
+
 class App {
   constructor() {
     this.container = document.body;
@@ -139,7 +141,6 @@ class App {
     });
   }
 
-
   finishMenuIntro() {
     this.corridor.removeMenuDoor();
     this.corridor.menuMode = false;
@@ -250,7 +251,6 @@ class App {
     const startYaw = yaw.rotation.y;
     const startPitch = pitchObj.rotation.x;
 
-
     const doorCenter = new THREE.Vector3();
     doorPivot.parent.getWorldPosition(doorCenter);
     doorCenter.y = startPos.y;
@@ -327,8 +327,9 @@ class App {
 
   finishExperience() {
     this.menus.markEnded();
-    this.menus.unlockQuietly();
+    this.isTransitioning = true;
     showEndScreen();
+    setTimeout(() => this.menus.unlockQuietly(), END_UNLOCK_MS);
   }
 
   fadeToBlack(callback) {

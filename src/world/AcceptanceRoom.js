@@ -13,6 +13,12 @@ const CFG = {
   growSeconds: 80, // de la semilla al capullo abierto
   sproutAt: 0.06, // fracción de crecimiento en la que aparece el primer brote (destraba la puerta)
   finaleDistance: 14, // metros caminados afuera antes de pasar a la pantalla final
+  // Al empezar el final el jugador sigue caminando solo hacia el horizonte mientras aparece el fundido
+  finaleWalk: {
+    speed: 1.6, // m/s (igual a la velocidad con teclas)
+    turnSeconds: 1.6, // lo que tarda la vista en enderezarse hacia el horizonte
+    stopZ: -100, // deja de caminar al llegar acá (ya sin nada que ver)
+  },
 
   // Acorde consonante (do mayor con 7ª y 9ª): cada objeto del memorial suma una nota
   chord: [130.81, 196.0, 329.63, 493.88, 587.33],
@@ -26,6 +32,17 @@ const CFG = {
     [-0.2, -26.2],
   ],
   pot: { x: 0, z: -19 },
+
+  // Polvo dorado y luciérnagas. Si tapan la planta: bajar maxPx / alpha / count o subir clearRadius
+  motes: {
+    dustMaxPx: 16, // tamaño máximo (px) de cada mota de polvo
+    fireflyMaxPx: 30, // tamaño máximo (px) de cada luciérnaga
+    nearFade: [0.9, 2.6], // distancia a la cámara (m): más cerca de 0.9 desaparecen; desde 2.6 se ven enteras
+    clearRadius: 0.6, // zona despejada (m) alrededor de la planta, sin luciérnagas
+    fireflyCount: 30,
+    fireflyAlpha: 0.7,
+    dustAlpha: [0.2, 0.45], // al empezar -> con la planta crecida
+  },
   table: { x: -7.0, z: -18.3, w: 2.7, d: 1.3 }, // w = ancho (eje z), d = profundidad (eje x)
 };
 
@@ -115,6 +132,10 @@ export class AcceptanceRoom {
     this.lastTime = null;
     this.lastPz = CFG.doorZ;
     this.yaw = null;
+    this._walk = null; // estado de la caminata automática del final
+    this._speed = 0; // velocidad estimada del jugador (m/s)
+    this._px = null;
+    this._pz = null;
 
     this.seedAvailable = false;
     this.pot = { seed: false, wet: false, growing: false, g: 0, t0: 0 };
@@ -1464,7 +1485,8 @@ export class AcceptanceRoom {
   }
 
   // Polvo dorado y luciérnagas alrededor de la planta
-  makeMotes(count, box, size, center) {
+  // opts.maxPx: tope de tamaño en pixeles. opts.clear: [x, z, radio] zona despejada (sin partículas)
+  makeMotes(count, box, size, center, opts = {}) {
     const pos = new Float32Array(count * 3),
       seed = new Float32Array(count);
     for (let i = 0; i < count; i++) {
@@ -1478,6 +1500,8 @@ export class AcceptanceRoom {
       );
       seed[i] = Math.random();
     }
+    const clear = opts.clear || [0, 0, 0];
+    const near = CFG.motes.nearFade;
     const geo = new THREE.BufferGeometry();
     geo.setAttribute("position", new THREE.BufferAttribute(pos, 3));
     geo.setAttribute("aSeed", new THREE.BufferAttribute(seed, 1));
@@ -1487,9 +1511,13 @@ export class AcceptanceRoom {
         uAlpha: { value: 0.3 },
         uSize: { value: size },
         uH: { value: box.y },
+        uMaxPx: { value: opts.maxPx || 64 },
+        uNear: { value: new THREE.Vector2(near[0], near[1]) },
+        uClear: { value: new THREE.Vector3(clear[0], clear[1], clear[2]) },
       },
       vertexShader: `
         uniform float uTime; uniform float uSize; uniform float uH;
+        uniform float uMaxPx; uniform vec2 uNear; uniform vec3 uClear;
         attribute float aSeed; varying float vA;
         void main(){
           vec3 p = position;
@@ -1497,9 +1525,19 @@ export class AcceptanceRoom {
           p.x += sin(uTime * 0.3 + aSeed * 20.0) * 0.4;
           p.z += cos(uTime * 0.25 + aSeed * 17.0) * 0.4;
           vec4 mv = modelViewMatrix * vec4(p, 1.0);
-          gl_PointSize = uSize * (0.6 + aSeed) * (180.0 / -mv.z);
+          float dist = max(-mv.z, 0.01);
+          // el tamaño crece al acercarse, pero con un tope (antes llegaba a cientos de pixeles)
+          gl_PointSize = min(uSize * (0.6 + aSeed) * (180.0 / dist), uMaxPx);
           gl_Position = projectionMatrix * mv;
-          vA = 0.5 + 0.5 * sin(uTime * 1.3 + aSeed * 30.0);
+          float twinkle = 0.5 + 0.5 * sin(uTime * 1.3 + aSeed * 30.0);
+          // se desvanece al pasar cerca de la cámara
+          float nearFade = smoothstep(uNear.x, uNear.y, dist);
+          // zona despejada alrededor de la planta
+          float clearFade = 1.0;
+          if (uClear.z > 0.0) {
+            clearFade = smoothstep(uClear.z * 0.6, uClear.z, length(p.xz - uClear.xy));
+          }
+          vA = twinkle * nearFade * clearFade;
         }`,
       fragmentShader: `
         uniform float uAlpha; varying float vA;
@@ -1523,12 +1561,17 @@ export class AcceptanceRoom {
       { x: 7, y: 5, z: 10 },
       5,
       new THREE.Vector3(0, 0, -19),
+      { maxPx: CFG.motes.dustMaxPx },
     );
     this.fireflyMat = this.makeMotes(
-      45,
+      CFG.motes.fireflyCount,
       { x: 1.1, y: 1.8, z: 1.1 },
       6,
       new THREE.Vector3(CFG.pot.x, 0.9, CFG.pot.z),
+      {
+        maxPx: CFG.motes.fireflyMaxPx,
+        clear: [CFG.pot.x, CFG.pot.z, CFG.motes.clearRadius],
+      },
     );
     this.fireflyMat.uniforms.uAlpha.value = 0;
 
@@ -1945,9 +1988,11 @@ export class AcceptanceRoom {
     this.grassMat.uniforms.uHope.value = hp;
     this.grassMat.uniforms.uTime.value = time;
     this.dustMat.uniforms.uTime.value = time;
-    this.dustMat.uniforms.uAlpha.value = 0.25 + 0.5 * hp;
+    const dA = CFG.motes.dustAlpha;
+    this.dustMat.uniforms.uAlpha.value = dA[0] + (dA[1] - dA[0]) * hp;
     this.fireflyMat.uniforms.uTime.value = time;
-    this.fireflyMat.uniforms.uAlpha.value = 0.9 * smooth(0.3, 1, this.pot.g);
+    this.fireflyMat.uniforms.uAlpha.value =
+      CFG.motes.fireflyAlpha * smooth(0.3, 1, this.pot.g);
     this.beams.forEach((b) => {
       b.mesh.material.opacity =
         (0.22 + 0.36 * hp) * (0.85 + 0.15 * Math.sin(time * 0.6 + b.phase));
@@ -2025,6 +2070,7 @@ export class AcceptanceRoom {
         this.yaw.position.z,
       );
       pz = this.yaw.position.z;
+      this.trackSpeed(pz, dt);
     }
     this.lastPz = pz;
 
@@ -2034,5 +2080,49 @@ export class AcceptanceRoom {
     this.updateItems(time, dt);
     this.updateClock(time);
     this.updateFinale(pz);
+    this.updateFinaleWalk(dt);
+  }
+
+  // Estima a qué velocidad camina el jugador, para que la caminata automática empalme sin tirón
+  trackSpeed(pz, dt) {
+    if (this.finale) return;
+    const x = this.yaw.position.x;
+    if (this._px !== null) {
+      const inst = Math.min(4, Math.hypot(x - this._px, pz - this._pz) / dt);
+      this._speed += (inst - this._speed) * 0.3;
+    }
+    this._px = x;
+    this._pz = pz;
+  }
+
+  // Final: el jugador no controla nada, pero sigue caminando hacia adelante mientras aparece el fundido
+  updateFinaleWalk(dt) {
+    if (!this.finale || !this.yaw || (this._walk && this._walk.done)) return;
+    const W = CFG.finaleWalk;
+    const yaw = this.yaw;
+    const pitch = this.camera.parent;
+    if (!this._walk) {
+      this._walk = {
+        t: 0,
+        done: false,
+        v0: Math.min(this._speed, W.speed), // arranca con la velocidad que traía
+        yaw0: yaw.rotation.y,
+        pitch0: pitch ? pitch.rotation.x : 0,
+      };
+    }
+    const w = this._walk;
+    w.t += dt;
+
+    // La vista se endereza de a poco hacia el horizonte (-z), por el camino más corto
+    const k = smooth(0, W.turnSeconds, w.t);
+    const dyaw = Math.atan2(Math.sin(-w.yaw0), Math.cos(-w.yaw0));
+    yaw.rotation.y = w.yaw0 + dyaw * k;
+    if (pitch) pitch.rotation.x = w.pitch0 * (1 - k);
+
+    // Velocidad: parte de la que traía y sube a la de caminata
+    const speed = THREE.MathUtils.lerp(w.v0, W.speed, smooth(0, 0.6, w.t));
+    yaw.position.x += -Math.sin(yaw.rotation.y) * speed * dt;
+    yaw.position.z += -Math.cos(yaw.rotation.y) * speed * dt;
+    if (yaw.position.z <= W.stopZ) w.done = true;
   }
 }
