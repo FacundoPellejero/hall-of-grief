@@ -40,8 +40,18 @@ class App {
     this.buildWorld();
     this.initRaycaster();
     this.animate();
+    this.hideBootScreen();
   }
-
+  hideBootScreen() {
+    const boot = document.getElementById("boot");
+    if (!boot) return;
+    requestAnimationFrame(() =>
+      requestAnimationFrame(() => {
+        boot.classList.add("is-hidden");
+        setTimeout(() => boot.remove(), 900);
+      }),
+    );
+  }
   initScene() {
     this.scene = new THREE.Scene();
     this.scene.background = new THREE.Color(0x020304);
