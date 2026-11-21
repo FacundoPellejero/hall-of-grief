@@ -33,6 +33,13 @@
         opacity: 0;
         pointer-events: none;
       }
+      #boot .boot__title {
+        font-size: clamp(2.2rem, 6vw, 3.8rem);
+        font-weight: 300;
+        line-height: 1.05;
+        letter-spacing: 0.04em;
+        color: #e5e7eb;
+      }
       #boot .boot__line {
         width: 56px;
         height: 1px;
@@ -69,6 +76,7 @@
   </head>
   <body>
     <div id="boot" role="status" aria-live="polite">
+      <span class="boot__title">Hall of Grief</span>
       <span class="boot__line" aria-hidden="true"></span>
       <span id="boot-text">Cargando…</span>
     </div>
