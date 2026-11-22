@@ -4,68 +4,6 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Hall of Grief</title>
-    <style>
-      #boot {
-        position: fixed;
-        inset: 0;
-        z-index: 200; /* por encima del menú (100) y del fundido (99) */
-        display: flex;
-        flex-direction: column;
-        align-items: center;
-        justify-content: center;
-        gap: 18px;
-        background: #020304; /* mismo color que scene.background */
-        color: #a3a9b3;
-        font-family:
-          system-ui,
-          -apple-system,
-          "Segoe UI",
-          Roboto,
-          Arial,
-          sans-serif;
-        font-size: 0.95rem;
-        letter-spacing: 0.08em;
-        text-align: center;
-        padding: 24px;
-        transition: opacity 0.8s ease;
-      }
-      #boot.is-hidden {
-        opacity: 0;
-        pointer-events: none;
-      }
-      #boot .boot__title {
-        font-size: clamp(2.2rem, 6vw, 3.8rem);
-        font-weight: 300;
-        line-height: 1.05;
-        letter-spacing: 0.04em;
-        color: #e5e7eb;
-        animation: boot-breathe 2.4s ease-in-out infinite;
-      }
-      #boot .boot__line {
-        width: 56px;
-        height: 1px;
-        background: rgba(209, 213, 219, 0.5);
-        animation: boot-breathe 2.4s ease-in-out infinite;
-      }
-      @keyframes boot-breathe {
-        0%,
-        100% {
-          opacity: 0.15;
-        }
-        50% {
-          opacity: 0.7;
-        }
-      }
-      @media (prefers-reduced-motion: reduce) {
-        #boot {
-          transition: none;
-        }
-        #boot .boot__line {
-          animation: none;
-          opacity: 0.5;
-        }
-      }
-    </style>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
@@ -76,20 +14,6 @@
     <link rel="stylesheet" href="./src/menus.css" />
   </head>
   <body>
-    <div id="boot" role="status" aria-live="polite">
-      <span class="boot__title">Hall of Grief</span>
-      <span class="boot__line" aria-hidden="true"></span>
-      <span id="boot-text">Cargando…</span>
-    </div>
-    <script>
-      // Si tarda de más (o main.js falla), se avisa en vez de dejar la pantalla muda
-      setTimeout(function () {
-        var t = document.getElementById("boot-text");
-        if (t)
-          t.textContent =
-            "Está tardando más de lo habitual. Si sigue así, recargá la página.";
-      }, 12000);
-    </script>
     <!-- Menú de inicio -->
     <div
       id="overlay"
