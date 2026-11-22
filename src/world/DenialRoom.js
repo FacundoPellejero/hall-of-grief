@@ -8,14 +8,14 @@ const FRAME_TILT = 0.12;
 const SIT = {
   eyeY: 1.15, // altura de los ojos sentado
   dx: 0.05, // corrimiento hacia el respaldo desde el centro del sillón
-  turn: 0.4, // radianes que gira la vista hacia la izquierda del frente del sillón 
+  turn: 0.4, // radianes que gira la vista hacia la izquierda del frente del sillón
   pitch: -0.2, // mira hacia abajo
   maxLookSide: 1.3, // radianes a cada lado del frente del sillón (1.2 ≈ 69°)
   maxLookDown: 0.25, // radianes: sentado no se puede mirar más hacia abajo que esto
   sitMs: 1200,
   standMs: 650,
 };
-const COLLISION_RADIUS = 0.3; 
+const COLLISION_RADIUS = 0.3;
 const CLOCK_STOPPED = { h: 3, m: 17, s: 41 };
 const DRAWER_OUT = 0.07;
 
@@ -94,7 +94,7 @@ export class DenialRoom {
     this.interactables = [];
     this.textures = [];
     this.anomaliesAccepted = 0;
-    this.totalAnomalies = 3;
+    this.totalAnomalies = 4;
     this.isDoorUnlocked = false;
     this._disposed = false;
     this._unlockTimeout = null;
@@ -1300,61 +1300,63 @@ export class DenialRoom {
     requestAnimationFrame(step);
   }
 
-  enableDragging(camera, domElement, uiPromptCallback, options = {}) {
+  enableDragging(camera, domElement) {
     this.disableDragging();
     const st = this.flowers;
-    const say = (msg) => {
-      (uiPromptCallback || this._ui || (() => {}))(msg);
-    };
-    const rc = new THREE.Raycaster();
-    const ndc = new THREE.Vector2();
+    const rc = new THREE.Raycaster(); // lleva el ramo (sin límite de distancia)
+    const pickRc = new THREE.Raycaster(); // agarrar: mismo alcance que main.js
+    pickRc.far = 2.2;
+    const ndc = new THREE.Vector2(0, 0); // siempre la mira del centro
     const target = new THREE.Vector3();
-    const baseCursor = domElement.style.cursor;
-    const useCrosshair = () =>
-      !!options.crosshair || !!document.pointerLockElement;
     const clamp = THREE.MathUtils.clamp;
-    let drag = null;
+    const sfx = () => this.audio?.playClickSound?.();
+    const HOLD_DIST = 0.7;
+    const HOLD_DROP = 0.2;
+    // Texto que muestra main.js al apuntar (userData compartido por todo el ramo)
+    let promptData = null;
+    st.group.traverse((o) => {
+      if (!promptData && o.isMesh) promptData = o.userData;
+    });
+    const idlePrompt = promptData ? promptData.prompt : "";
+    const setPrompt = (t) => {
+      if (promptData) promptData.prompt = t;
+    };
+
+    let carry = null;
+    let busy = false; // mientras entra al jarrón no se puede volver a agarrar
     let lastT = 0;
 
-    const setNdc = (e) => {
-      if (useCrosshair()) {
-        ndc.set(0, 0);
-        return;
-      }
-      const rect = domElement.getBoundingClientRect();
-      ndc.set(
-        ((e.clientX - rect.left) / rect.width) * 2 - 1,
-        -((e.clientY - rect.top) / rect.height) * 2 + 1,
-      );
-    };
     const pickBouquet = (cam) => {
       cam.updateMatrixWorld();
-      rc.setFromCamera(ndc, cam);
+      pickRc.setFromCamera(ndc, cam);
       st.group.updateMatrixWorld(true);
-      return rc.intersectObject(st.group, true)[0];
+      return pickRc.intersectObject(st.group, true)[0];
     };
 
     const tick = (cam) => {
-      if (!drag) return;
+      if (!carry) return;
       const now = performance.now();
       const dt = Math.min(0.05, (now - lastT) / 1000);
       lastT = now;
-      if (useCrosshair()) ndc.set(0, 0);
       cam.updateMatrixWorld();
       rc.setFromCamera(ndc, cam);
 
       target
         .copy(rc.ray.direction)
-        .multiplyScalar(drag.dist)
+        .multiplyScalar(carry.dist)
         .add(rc.ray.origin);
       this.roomGroup.worldToLocal(target);
-      target.y -= 0.3;
+      target.y -= HOLD_DROP;
 
       st.vaseCatcher.updateMatrixWorld(true);
-      drag.overVase =
+      const over =
         rc.intersectObject(st.vaseCatcher, false).length > 0 ||
         target.distanceTo(st.vaseT) < 0.45;
-      if (drag.overVase) target.copy(st.hoverT);
+      if (over !== carry.overVase) {
+        carry.overVase = over;
+        setPrompt(over ? "Dejar en el jarrón" : "Soltar");
+      }
+      if (over) target.copy(st.hoverT);
       target.x = clamp(target.x, st.bounds.minX, st.bounds.maxX);
       target.z = clamp(target.z, st.bounds.minZ, st.bounds.maxZ);
       target.y = clamp(target.y, 0.3, 2.6);
@@ -1363,84 +1365,69 @@ export class DenialRoom {
       this._flushBouquet();
     };
     const loop = () => {
-      if (!drag) return;
+      if (!carry) return;
       if (performance.now() - (this._renderHookAt || 0) > 100) tick(camera);
       requestAnimationFrame(loop);
     };
 
-    const onDown = (e) => {
-      if (st.placed || e.button !== 0) return;
-      setNdc(e);
-      const h = pickBouquet(camera);
-      if (!h) return;
-      e.stopImmediatePropagation();
-      e.preventDefault();
+    const pick = (hit) => {
       if (st.anim) {
         st.anim.cancelled = true;
         st.anim = null;
       }
-      drag = { overVase: false, dist: clamp(h.distance, 0.9, 2.2) };
+      carry = { overVase: false, dist: HOLD_DIST };
       this.isDragging = true;
       this._dragTick = tick;
-      domElement.style.cursor = "grabbing";
-      if (!document.pointerLockElement) {
-        try {
-          domElement.setPointerCapture(e.pointerId);
-        } catch (err) {}
-      }
+      setPrompt("Soltar");
+      sfx();
       lastT = performance.now();
       requestAnimationFrame(loop);
     };
 
-    const onMove = (e) => {
-      if (document.pointerLockElement && !options.crosshair) return;
-      if (!document.pointerLockElement) setNdc(e);
-      if (
-        !drag &&
-        !st.placed &&
-        !document.pointerLockElement &&
-        e.target === domElement
-      ) {
-        domElement.style.cursor = pickBouquet(camera) ? "grab" : baseCursor;
-      }
-    };
-
-    const onUp = () => {
-      if (!drag) return;
-      const dropped = drag.overVase;
-      drag = null;
+    const drop = () => {
+      const overVase = carry.overVase;
+      carry = null;
       this.isDragging = false;
       this._dragTick = null;
-      domElement.style.cursor = baseCursor;
-      if (dropped) {
+      setPrompt(idlePrompt);
+      sfx();
+      if (overVase) {
+        busy = true;
         this._tweenBouquet(st.vaseT, 1, 0.45, () => {
           st.placed = true;
           const idx = this.interactables.indexOf(st.group);
           if (idx >= 0) this.interactables.splice(idx, 1);
-          // say("Colocas las flores en el jarrón.");
+          this.anomaliesAccepted++;
+          this.checkProgress(this._ui || this.say);
         });
       } else {
         this._tweenBouquet(st.lyingT, 0, 0.5);
       }
     };
 
-    document.addEventListener("pointerdown", onDown, { capture: true });
-    window.addEventListener("pointermove", onMove);
-    window.addEventListener("pointerup", onUp);
-    window.addEventListener("mouseup", onUp);
-    window.addEventListener("pointercancel", onUp);
-    window.addEventListener("blur", onUp);
+    // En captura y frenando el evento: ese clic no llega al manejador de main.js
+    // (si no, soltar las flores mirando la puerta o el cajón también los activaría)
+    const onClick = (e) => {
+      if (!document.pointerLockElement || st.placed || busy) return;
+      if (carry) {
+        e.stopImmediatePropagation();
+        drop();
+        return;
+      }
+      if (this.seated || performance.now() < this._ignoreInteractUntil) return;
+      const hit = pickBouquet(camera);
+      if (!hit) return;
+      e.stopImmediatePropagation();
+      pick(hit);
+    };
+
+    document.addEventListener("click", onClick, { capture: true });
     this._dragCleanup = () => {
-      document.removeEventListener("pointerdown", onDown, { capture: true });
-      window.removeEventListener("pointermove", onMove);
-      window.removeEventListener("pointerup", onUp);
-      window.removeEventListener("mouseup", onUp);
-      window.removeEventListener("pointercancel", onUp);
-      window.removeEventListener("blur", onUp);
-      domElement.style.cursor = baseCursor;
-      drag = null;
+      document.removeEventListener("click", onClick, { capture: true });
+      carry = null;
       this.isDragging = false;
       this._dragTick = null;
+      setPrompt(idlePrompt);
     };
   }
 
@@ -1900,7 +1887,6 @@ export class DenialRoom {
     this._limitSeatedLook();
   }
 
-  
   _collide() {
     if (this.seated || this._seatRaf !== null || !this._colliders) return; // sentándose/levantándose atraviesa el sillón
     const yaw = this._yawObject();
@@ -1941,14 +1927,12 @@ export class DenialRoom {
     yaw.position.z = z + oz;
   }
 
- 
   _limitSeatedLook() {
     if (!this.seated || this._seatRaf !== null) return;
     const pitch = this._pitchObject();
     if (pitch && pitch.rotation.x < -SIT.maxLookDown)
       pitch.rotation.x = -SIT.maxLookDown;
 
-  
     const yaw = this._yawObject();
     if (!yaw) return;
     const front = Math.PI / 2;
@@ -1962,7 +1946,7 @@ export class DenialRoom {
   }
 
   _yawObject() {
-    return this.camera?.parent?.parent || null; 
+    return this.camera?.parent?.parent || null;
   }
 
   _pitchObject() {
@@ -2036,7 +2020,6 @@ export class DenialRoom {
     document.addEventListener("keydown", this._onSeatKey);
     document.addEventListener("mousedown", this._onSeatMouse);
 
-
     this._poseTween(
       {
         x: sofaPos.x + SIT.dx,
@@ -2072,7 +2055,7 @@ export class DenialRoom {
     const step = (now) => {
       if (this._disposed) return;
       const k = Math.min(1, Math.max(0, (now - t0) / duration));
-      const eased = 1 - Math.pow(1 - k, 3); 
+      const eased = 1 - Math.pow(1 - k, 3);
       frame.rotation.z = from * (1 - eased);
       if (k < 1) {
         this._frameRaf = requestAnimationFrame(step);
@@ -2090,12 +2073,10 @@ export class DenialRoom {
       return;
     this.isDoorUnlocked = true;
 
-   
     this.interactables = this.interactables.filter(
       (o) => o.userData.id !== "sofa",
     );
 
-  
     this.entryDoorGroup.traverse((c) => {
       if (c.userData && c.userData.id === "entryDoor") {
         c.userData.prompt = "La realidad sigue ahí (Interactuar)";
