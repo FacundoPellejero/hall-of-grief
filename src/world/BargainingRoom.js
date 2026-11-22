@@ -17,6 +17,8 @@ const smooth = (e0, e1, x) => {
   return t * t * (3 - 2 * t);
 };
 
+const COLLISION_RADIUS = 0.3;
+
 export class BargainingRoom {
   constructor(scene, doorFactory, initialState, camera, audio, say) {
     this.scene = scene;
@@ -60,6 +62,7 @@ export class BargainingRoom {
     this.wallProps = [];
 
     this.buildRoom();
+    this._buildColliders();
     this.audio?.startBargain();
   }
 
@@ -225,6 +228,58 @@ export class BargainingRoom {
     this.buildFurnitureAndObjects();
     this.buildFloatingPapers();
     this.applyRoomSize(this.currentW, this.currentH);
+  }
+
+
+    // Colisión simple con la mesa (misma idea que DenialRoom)
+  _buildColliders() {
+    this.roomGroup.updateMatrixWorld(true);
+    const off = this.roomGroup.position;
+    const b = new THREE.Box3().setFromObject(this.tableGroup);
+    this._colliders = [
+      {
+        minX: b.min.x - off.x,
+        maxX: b.max.x - off.x,
+        minZ: b.min.z - off.z,
+        maxZ: b.max.z - off.z,
+      },
+    ];
+  }
+
+  _collide() {
+    const yaw = this.camera?.parent?.parent;
+    if (!yaw || !this._colliders) return;
+    const ox = this.roomGroup.position.x;
+    const oz = this.roomGroup.position.z;
+    const R = COLLISION_RADIUS;
+    let x = yaw.position.x - ox;
+    let z = yaw.position.z - oz;
+    for (const b of this._colliders) {
+      const cx = Math.max(b.minX, Math.min(x, b.maxX));
+      const cz = Math.max(b.minZ, Math.min(z, b.maxZ));
+      const dx = x - cx;
+      const dz = z - cz;
+      const d2 = dx * dx + dz * dz;
+      if (d2 >= R * R) continue;
+      if (d2 > 1e-10) {
+        const d = Math.sqrt(d2);
+        x = cx + (dx / d) * R;
+        z = cz + (dz / d) * R;
+      } else {
+        // adentro de la caja: se lo saca por el lado más cercano
+        const l = x - b.minX;
+        const r = b.maxX - x;
+        const f = z - b.minZ;
+        const n = b.maxZ - z;
+        const mn = Math.min(l, r, f, n);
+        if (mn === l) x = b.minX - R;
+        else if (mn === r) x = b.maxX + R;
+        else if (mn === f) z = b.minZ - R;
+        else z = b.maxZ + R;
+      }
+    }
+    yaw.position.x = x + ox;
+    yaw.position.z = z + oz;
   }
 
   applyRoomSize(w, h) {
@@ -662,6 +717,7 @@ export class BargainingRoom {
 
   // Bucle principal
   update(time) {
+    this._collide();
     if (!this.lastTime) this.lastTime = time;
     const dt = Math.min(0.05, time - this.lastTime);
     this.lastTime = time;
