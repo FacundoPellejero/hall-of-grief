@@ -93,7 +93,7 @@ class App {
   buildWorld() {
     this.corridor = new Corridor(this.scene);
     this.corridor.setCorridorState(0, this.scene);
-    this.initCorridorStateControls();
+    
     this.setupMenuShot();
   }
 
@@ -169,25 +169,7 @@ class App {
     this.isTransitioning = false;
   }
 
-  initCorridorStateControls() {
-    document.addEventListener("keydown", (event) => {
-      const stateByKey = {
-        Digit0: 0,
-        Digit1: 1,
-        Digit2: 2,
-        Digit3: 3,
-        Numpad0: 0,
-        Numpad1: 1,
-        Numpad2: 2,
-        Numpad3: 3,
-      };
-      const state = stateByKey[event.code];
-      if (state === undefined) return;
-      this.corridor.setCorridorState(state, this.scene);
-      this.audioManager.setCorridorAudioState(state);
-    });
-  }
-
+ 
   initRaycaster() {
     this.raycaster = new THREE.Raycaster();
     this.raycaster.far = 2.2; //no tocar, es para no poder interactuar desde muy lejos
