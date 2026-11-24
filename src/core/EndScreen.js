@@ -2,7 +2,25 @@
 export const END_LINES = ["Lo que fue, sigue creciendo."];
 
 export const END_CONFIG = {
-  resources: [], // por ejemplo: [{ label: "Línea de apoyo ...", detail: "número o enlace" }]
+  resources: [
+    {
+      label: "Línea de Salud Mental (Municipalidad de Córdoba)",
+      phone: "0800-888-5555",
+      note: "gratuita, confidencial, 24 hs",
+    },
+    {
+      label: "Fundación Argentina para el Duelo",
+      url: "https://www.instagram.com/duelarf/",
+    },
+    {
+      label: "Fundación Aikén",
+      url: "https://www.fundacionaiken.org.ar/en/",
+    },
+    {
+      label: "Red de Servicios de Salud y Atención Psicológica (ReSSAP - UNC)",
+      url: "https://unc.edu.ar",
+    },
+  ],
   feedbackUrl: "", // enlace a un formulario con las preguntas abiertas del plan de pruebas
 };
 
@@ -50,15 +68,68 @@ export function showEndScreen({
     box.append(title, line, note);
 
     if (resources.length) {
+      const css = document.createElement("style");
+      css.textContent = `
+        .hog-end-link {
+          color: #6a4a2a;
+          text-decoration: underline;
+          text-decoration-color: rgba(106, 74, 42, 0.35);
+          text-underline-offset: 3px;
+          transition: color 0.2s ease, text-decoration-color 0.2s ease;
+        }
+        .hog-end-link:hover,
+        .hog-end-link:focus-visible {
+          color: #3b2f22;
+          text-decoration-color: currentColor;
+        }
+        .hog-end-link:focus-visible {
+          outline: 2px solid #6a4a2a;
+          outline-offset: 3px;
+          border-radius: 2px;
+        }`;
+      box.appendChild(css);
+
+      const wrap = document.createElement("div");
+      wrap.style.cssText =
+        "max-width:440px;margin:0 auto 1.8rem;padding-top:1.1rem;border-top:1px solid rgba(90,74,56,0.18);";
+
+      const head = document.createElement("p");
+      head.textContent = "Si necesitás apoyo o querés hablar con alguien:";
+      head.style.cssText =
+        "font-size:0.8rem;margin-bottom:0.8rem;color:#7a6a58;";
+      wrap.appendChild(head);
+
+      const mkLink = (text, href, external) => {
+        const a = document.createElement("a");
+        a.className = "hog-end-link";
+        a.textContent = text;
+        a.href = href;
+        if (external) {
+          a.target = "_blank";
+          a.rel = "noopener noreferrer";
+        }
+        return a;
+      };
+
       const list = document.createElement("ul");
       list.style.cssText =
-        "list-style:none;font-size:0.9rem;margin-bottom:1.2rem;color:#5a4a38;";
+        "list-style:none;margin:0;padding:0;font-size:0.82rem;line-height:1.45;color:#7a6a58;";
       resources.forEach((r) => {
         const li = document.createElement("li");
-        li.textContent = r.detail ? `${r.label}: ${r.detail}` : r.label;
+        li.style.cssText = "margin-bottom:0.55rem;";
+        if (r.url) li.appendChild(mkLink(r.label, r.url, true));
+        else li.append(r.label);
+        if (r.phone) {
+          li.append(document.createElement("br"));
+          li.appendChild(
+            mkLink(r.phone, `tel:${r.phone.replace(/[^\d+]/g, "")}`, false),
+          );
+        }
+        if (r.note) li.append(` · ${r.note}`);
         list.appendChild(li);
       });
-      box.appendChild(list);
+      wrap.appendChild(list);
+      box.appendChild(wrap);
     }
     if (feedbackUrl) {
       const a = document.createElement("a");
